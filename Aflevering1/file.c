@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
         int read = fread(&asciiChar, 1, 1, file);
         int asciiCodeChar = (int) asciiChar;
         
-        if(asciiCodeChar > 127) {
+        if(asciiCodeChar > 128) {
             checkAscii = 1;
         }
 
