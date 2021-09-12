@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
             checkAscii = 1;
         }
 
-        if(asciiCodeChar > 128 || asciiCodeChar < 159 && asciiCodeChar > 256) {
+        if(asciiCodeChar > 128 || (asciiCodeChar < 159 && asciiCodeChar > 256)) {
             checkISO8859 = 1;
         }
 
