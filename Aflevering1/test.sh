@@ -13,8 +13,20 @@ rm -f test_files/*
 
 echo "Generating test files.."
 printf "Hello, World!\n" > test_files/ascii.input
-printf "Hello, World!" > test_files/ascii2.input
+printf "Hej verden!" > test_files/ascii2.input
+printf "Hvor er du?!" > test_files/ascii3.input
+printf "test paa et sas!" > test_files/ascii4.input
+printf "test paa et #!" > test_files/ascii5.input
+printf "test paa et \!" > test_files/ascii6.input
+
 printf "Hello,\x00World!\n" > test_files/data.input
+printf "Hello,\x88World!\n" > test_files/data2.input
+printf "Hello,\x130World!\n" > test_files/data3.input
+printf "Hello,\x00World!\n" > test_files/data4.input
+printf "Hello,\x00World!\n" > test_files/data5.input
+printf "Hello,\x00World!\n" > test_files/data6.input
+printf "Hello,\x00World!\n" > test_files/data7.input
+
 printf "" > test_files/empty.input
 ### TODO: Generate more test files ###
 

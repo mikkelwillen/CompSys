@@ -42,17 +42,17 @@ int main(int argc, char* argv[]) {
         char asciiChar;
         int read = fread(&asciiChar, 1, 1, file);
         int asciiCodeChar = (int) asciiChar;
-        printf(" %d = %c ", asciiCodeChar, asciiChar);
+        // printf(" %c = %d ", asciiChar, asciiCodeChar);
 
         // skal vi lave errnoChecks over det hele???
         
-
         // hvad sker der for a,ø,å på bitform??
-        if(asciiCodeChar > 128) {
+        // fix det rigtige interval
+        if(asciiCodeChar > 0x80 && asciiCodeChar < 0x07) {
             checkAscii = 1;
         }
 
-        if(asciiCodeChar > 128 || (asciiCodeChar < 159 && asciiCodeChar > 256)) {
+        if((asciiCodeChar > 128 && asciiCodeChar < 6) || (asciiCodeChar < 159 && asciiCodeChar > 256)) {
             checkISO8859 = 1;
         }
 
@@ -66,9 +66,9 @@ int main(int argc, char* argv[]) {
     if (read == 0) {
         fileType = "empty";
     } else if (checkAscii == 0) {
-        fileType = "ascii";
+        fileType = "ASCII text";
     } else if (checkISO8859 == 0) {
-        fileType = "ISO8859";
+        fileType = "ISO-8859 text";
     } else {
         fileType = "data";
     }
