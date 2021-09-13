@@ -19,13 +19,21 @@ printf "test paa et sas!" > test_files/ascii4.input
 printf "test paa et #!" > test_files/ascii5.input
 printf "test paa et \!" > test_files/ascii6.input
 
+printf "Hello,\xa0World!\n" > test_files/ISO.input
+printf "Hello,\xa1World!\n" > test_files/ISO2.input
+printf "Hello,\xa2World!\n" > test_files/ISO3.input
+printf "Hello,\xa3World!\n" > test_files/ISO4.input
+printf "Hello,\xa4World!\n" > test_files/ISO5.input
+printf "Hello,\xa5World!\n" > test_files/ISO6.input
+printf "Hello,\xa6World!\n" > test_files/ISO7.input
+
 printf "Hello,\x00World!\n" > test_files/data.input
-printf "Hello,\x88World!\n" > test_files/data2.input
-printf "Hello,\x130World!\n" > test_files/data3.input
-printf "Hello,\x00World!\n" > test_files/data4.input
-printf "Hello,\x00World!\n" > test_files/data5.input
-printf "Hello,\x00World!\n" > test_files/data6.input
-printf "Hello,\x00World!\n" > test_files/data7.input
+printf "Hello,\x01World!\n" > test_files/data2.input
+printf "Hello,\x02World!\n" > test_files/data3.input
+printf "Hello,\x03World!\n" > test_files/data4.input
+printf "Hello,\x04World!\n" > test_files/data5.input
+printf "Hello,\x05World!\n" > test_files/data6.input
+printf "Hello,\x06World!\n" > test_files/data7.input
 
 printf "" > test_files/empty.input
 ### TODO: Generate more test files ###
