@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 
 int print_error(char* path, int errnum) {
@@ -19,7 +20,7 @@ int errnoCheck(char* path) {
 int main(int argc, char* argv[]) {
     if (argc == 1) {
         fprintf(stderr, "Usage: file path\n" );
-        return 1;
+        return EXIT_FAILURE;
     }
 
     assert(argc == 2);
@@ -49,9 +50,6 @@ int main(int argc, char* argv[]) {
         
         // printf(" %c = %d ", asciiChar, asciiCodeChar);
 
-        // skal vi lave errnoChecks over det hele???
-        
-        // hvad sker der for a,ø,å på bitform??
         // fix det rigtige interval
         if(asciiCodeChar > 127 || asciiCodeChar < 7) {
             checkAscii = 1;
@@ -82,5 +80,5 @@ int main(int argc, char* argv[]) {
     }
 
     fprintf(stdout, "%s: %s\n", inputFile, fileType);
-    return 0;
+    return EXIT_SUCCESS;
 }
