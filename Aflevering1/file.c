@@ -14,7 +14,7 @@ int errnoCheck(char* path) {
     if (errnoTemp != 0) {
         print_error(path, errnoTemp);
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char* argv[]) {
@@ -30,11 +30,6 @@ int main(int argc, char* argv[]) {
     FILE* file = fopen(inputFile, "r");
     errnoCheck(argv[1]);
     char* fileType;
-    
-    // if (file == NULL) {
-    //     fprintf(stdout, "No file with that name exists\n");
-    //     return 0;
-    // }
 
     char emptyDocument;
     int read = fread(&emptyDocument, 1, 1, file);
