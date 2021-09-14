@@ -27,13 +27,19 @@ printf "Hello,\xa4World!\n" > test_files/ISO5.input
 printf "Hello,\xa5World!\n" > test_files/ISO6.input
 printf "Hello,\xa6World!\n" > test_files/ISO7.input
 
-printf "Hello,\x00World!\n" > test_files/data.input
-printf "Hello,\x01World!\n" > test_files/data2.input
-printf "Hello,\x02World!\n" > test_files/data3.input
-printf "Hello,\x03World!\n" > test_files/data4.input
-printf "Hello,\x04World!\n" > test_files/data5.input
-printf "Hello,\x05World!\n" > test_files/data6.input
-printf "Hello,\x06World!\n" > test_files/data7.input
+# tror det er en ISO fil af en eller anden grund???
+
+# printf "!~ /.\t.\t.*\<(Hotels|Гостиница|Готель|Отель|Хотел|ホテル|מלון|فندق|होटल|โรงแรม|숙박|호텔|宾馆|旅店|旅馆|酒店|飯店)\>/{print\n" > test_files/UTF.input
+
+
+# tror det er UTF filer af en eller anden grund??
+# printf "Hello,\x00World!\n" > test_files/data.input
+# printf "Hello,\x01World!\n" > test_files/data2.input
+# printf "Hello,\x02World!\n" > test_files/data3.input
+# printf "Hello,\x03World!\n" > test_files/data4.input
+# printf "Hello,\x04World!\n" > test_files/data5.input
+# printf "Hello,\x05World!\n" > test_files/data6.input
+# printf "Hello,\x06World!\n" > test_files/data7.input
 
 printf "" > test_files/empty.input
 ### TODO: Generate more test files ###

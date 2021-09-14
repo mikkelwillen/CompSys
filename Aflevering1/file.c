@@ -38,9 +38,14 @@ int main(int argc, char* argv[]) {
 
     char emptyDocument;
     int read = fread(&emptyDocument, 1, 1, file);
+    
+    fclose(file);
+    file = fopen(inputFile, "r");
+    errnoCheck(argv[1]);
 
     int checkAscii = 0;
     int checkISO8859 = 0;
+    int checkUTF8 = 0;
 
     while(1) {
         char asciiChar;
@@ -51,14 +56,96 @@ int main(int argc, char* argv[]) {
         // printf(" %c = %d ", asciiChar, asciiCodeChar);
 
         // fix det rigtige interval
-        if(asciiCodeChar > 127 || asciiCodeChar < 7) {
-            checkAscii = 1;
+        if(asciiCodeChar > 127 || asciiCodeChar < 32) {
+            if(asciiCodeChar > 13 || asciiCodeChar < 7) {
+                if(asciiCodeChar != 27) {
+                    checkAscii = 1;
+                    break;
+                }
+            }  
         }
 
-        if(asciiCodeChar > 127 || asciiCodeChar < 7) {
-            if(asciiCodeChar > -1 || asciiCodeChar < -159) {
-                checkISO8859 = 1;
+
+        if(asciiCodeChar > 127 || asciiCodeChar < 32) {
+            if(asciiCodeChar > 13 || asciiCodeChar < 7) {
+                if(asciiCodeChar != 27) {
+                    if(asciiCodeChar > -1 || asciiCodeChar < -159) {
+                        checkISO8859 = 1;
+                        break;
+                    }
+                }
+            }  
+        }
+
+        if (read == 0) {
+            break;
+        }
+    }
+
+    fclose(file);
+    file = fopen(inputFile, "r");
+    errnoCheck(argv[1]);
+
+    while(1) {
+        int UTF8;
+        int read = fread(&UTF8, 1, 1, file);
+        errnoCheck(argv[1]);
+        int newValue4Byte = UTF8 >> 3;
+        int newValue3Byte = UTF8 >> 4;
+        int newValue2Byte = UTF8 >> 5;
+        int newValue1Byte = UTF8 >> 7;
+        
+
+        if(newValue4Byte == 30) {
+            read = fread(&UTF8, 1, 1, file);
+            newValue4Byte = UTF8 >> 2;
+            if (newValue4Byte == 2) {
+                read = fread(&UTF8, 1, 1, file);
+                newValue4Byte = UTF8 >> 2;
+                if (newValue4Byte == 2) {
+                    read = fread(&UTF8, 1, 1, file);
+                    newValue4Byte = UTF8 >> 2;
+                    if (newValue4Byte == 2) {
+                        
+                    } else {
+                        checkUTF8 = 1;
+                        break;
+                    }
+                } else {
+                    checkUTF8 = 1;
+                    break;
+                }
+            } else {
+                checkUTF8 = 1;
+                break;
             }
+        } else if (newValue3Byte == 14) {
+            read = fread(&UTF8, 1, 1, file);
+            newValue3Byte = UTF8 >> 2;
+            if (newValue3Byte == 2) {
+                read = fread(&UTF8, 1, 1, file);
+                newValue3Byte = UTF8 >> 2;
+                if (newValue3Byte == 2) {
+                    
+                } else {
+                    checkUTF8 = 1;
+                    break;
+                }
+            }
+        } else if (newValue2Byte == 6) {
+            read = fread(&UTF8, 1, 1, file);
+            newValue2Byte = UTF8 >> 2;
+            if (newValue2Byte == 2) {
+                
+            } else {
+                checkUTF8 = 1;
+                break;
+            }
+        } else if (newValue1Byte == 0) {
+            
+        } else {
+            checkUTF8 = 1;
+            break;
         }
 
         if (read == 0) {
@@ -75,6 +162,8 @@ int main(int argc, char* argv[]) {
         fileType = "ASCII text";
     } else if (checkISO8859 == 0) {
         fileType = "ISO-8859 text";
+    } else if (checkUTF8 == 0) {
+        fileType = "UTF-8 Unicode text";
     } else {
         fileType = "data";
     }
