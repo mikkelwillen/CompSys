@@ -39,23 +39,26 @@ int main(int argc, char* argv[]) {
     errnoCheck(argv[1]);
 
     int checkAscii = 0;
-    int checkISO8859 = 0;
+    int checkISO8859 = 1;
     int checkUTF8 = 0;
 
     while(1) {
-        char asciiChar;
+        unsigned char asciiChar;
         int read = fread(&asciiChar, 1, 1, file);
         errnoCheck(argv[1]);
         int asciiCodeChar = (int) asciiChar;
         
-        // printf(" %c = %d ", asciiChar, asciiCodeChar);
+        if (read == 0) {
+            break;
+        }
+        
+        printf(" %c = %d ", asciiChar, asciiCodeChar);
 
         // fix det rigtige interval
         if(asciiCodeChar > 127 || asciiCodeChar < 32) {
             if(asciiCodeChar > 13 || asciiCodeChar < 7) {
                 if(asciiCodeChar != 27) {
                     checkAscii = 1;
-                    break;
                 }
             }  
         }
@@ -64,16 +67,11 @@ int main(int argc, char* argv[]) {
         if(asciiCodeChar > 127 || asciiCodeChar < 32) {
             if(asciiCodeChar > 13 || asciiCodeChar < 7) {
                 if(asciiCodeChar != 27) {
-                    if(asciiCodeChar > -1 || asciiCodeChar < -159) {
+                    if(asciiCodeChar > 255 || asciiCodeChar < 160) {
                         checkISO8859 = 1;
-                        break;
                     }
                 }
             }  
-        }
-
-        if (read == 0) {
-            break;
         }
     }
 
@@ -82,14 +80,17 @@ int main(int argc, char* argv[]) {
     errnoCheck(argv[1]);
 
     while(1) {
-        int UTF8;
+        unsigned char UTF8;
         int read = fread(&UTF8, 1, 1, file);
         errnoCheck(argv[1]);
         int newValue4Byte = UTF8 >> 3;
         int newValue3Byte = UTF8 >> 4;
         int newValue2Byte = UTF8 >> 5;
         int newValue1Byte = UTF8 >> 7;
-        
+
+        if (read == 0) {
+            break;
+        }        
 
         if(newValue4Byte == 30) {
             read = fread(&UTF8, 1, 1, file);
@@ -140,10 +141,6 @@ int main(int argc, char* argv[]) {
             
         } else {
             checkUTF8 = 1;
-            break;
-        }
-
-        if (read == 0) {
             break;
         }
     }
