@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
     errnoCheck(argv[1]);
 
     int checkAscii = 0;
-    int checkISO8859 = 1;
+    int checkISO8859 = 0;
     int checkUTF8 = 0;
 
     while(1) {
@@ -51,8 +51,8 @@ int main(int argc, char* argv[]) {
         if (read == 0) {
             break;
         }
-        
-        printf(" %c = %d ", asciiChar, asciiCodeChar);
+
+        // printf(" %c = %d ", asciiChar, asciiCodeChar);
 
         // fix det rigtige interval
         if(asciiCodeChar > 127 || asciiCodeChar < 32) {
@@ -90,17 +90,21 @@ int main(int argc, char* argv[]) {
 
         if (read == 0) {
             break;
-        }        
+        }
+
+        if (UTF8 < 7) {
+            checkUTF8 = 1;
+        }       
 
         if(newValue4Byte == 30) {
             read = fread(&UTF8, 1, 1, file);
-            newValue4Byte = UTF8 >> 2;
+            newValue4Byte = UTF8 >> 6;
             if (newValue4Byte == 2) {
                 read = fread(&UTF8, 1, 1, file);
-                newValue4Byte = UTF8 >> 2;
+                newValue4Byte = UTF8 >> 6;
                 if (newValue4Byte == 2) {
                     read = fread(&UTF8, 1, 1, file);
-                    newValue4Byte = UTF8 >> 2;
+                    newValue4Byte = UTF8 >> 6;
                     if (newValue4Byte == 2) {
                         
                     } else {
@@ -117,10 +121,10 @@ int main(int argc, char* argv[]) {
             }
         } else if (newValue3Byte == 14) {
             read = fread(&UTF8, 1, 1, file);
-            newValue3Byte = UTF8 >> 2;
+            newValue3Byte = UTF8 >> 6;
             if (newValue3Byte == 2) {
                 read = fread(&UTF8, 1, 1, file);
-                newValue3Byte = UTF8 >> 2;
+                newValue3Byte = UTF8 >> 6;
                 if (newValue3Byte == 2) {
                     
                 } else {
@@ -130,7 +134,7 @@ int main(int argc, char* argv[]) {
             }
         } else if (newValue2Byte == 6) {
             read = fread(&UTF8, 1, 1, file);
-            newValue2Byte = UTF8 >> 2;
+            newValue2Byte = UTF8 >> 6;
             if (newValue2Byte == 2) {
                 
             } else {
