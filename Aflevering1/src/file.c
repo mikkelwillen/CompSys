@@ -54,7 +54,6 @@ int main(int argc, char* argv[]) {
 
         // printf(" %c = %d ", asciiChar, asciiCodeChar);
 
-        // fix det rigtige interval
         if(asciiCodeChar > 127 || asciiCodeChar < 32) {
             if(asciiCodeChar > 13 || asciiCodeChar < 7) {
                 if(asciiCodeChar != 27) {
@@ -149,9 +148,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-
-    // UTF-Unicode, hvad i al verden??
-    // prøv at kig på bits og deres startværdier, de skal nemlig være noget specifikt, for at det kan være UTF
     if (read == 0) {
         fileType = "empty";
     } else if (checkAscii == 0) {
