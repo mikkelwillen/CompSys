@@ -62,7 +62,6 @@ int main(int argc, char* argv[]) {
             }  
         }
 
-
         if(asciiCodeChar > 127 || asciiCodeChar < 32) {
             if(asciiCodeChar > 13 || asciiCodeChar < 7) {
                 if(asciiCodeChar != 27) {
