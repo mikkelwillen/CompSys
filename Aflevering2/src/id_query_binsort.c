@@ -46,7 +46,6 @@ const struct record* binarySearch(struct indexed_data *data, int64_t needle, int
     return NULL;
 }
 
-
 struct indexed_data* mk_indexed(struct record* rs, int n) {
     struct indexed_data *id = malloc(sizeof(struct indexed_data));
     id->n = n;
