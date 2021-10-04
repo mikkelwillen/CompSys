@@ -34,8 +34,13 @@ int compare_lat(struct record *arg1, struct record *arg2) {
     }
 }
 
-struct node* construction(struct record* rs, int n, int depth) {
-    struct record* sorted_rs = rs;
+struct node* construction(struct record *rs, int n, int depth) {
+    printf("%d", n);
+    if (n == 1) {
+      return NULL;
+    }
+    struct record* sorted_rs = malloc(sizeof(struct record));
+    sorted_rs = rs;
     struct node *nd = malloc(sizeof(struct node));
     nd->axis = depth % 2;
     if (nd->axis == 0) {
