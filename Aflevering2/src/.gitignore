@@ -3,5 +3,6 @@
 !*.*
 !Makefile
 /10000records.tsv
+/100records.tsv
 /planet-latest_geonames.tsv
 *.o

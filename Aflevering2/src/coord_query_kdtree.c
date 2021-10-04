@@ -35,44 +35,28 @@ int compare_lat(struct record *arg1, struct record *arg2) {
 }
 
 struct node* construction(struct record *rs, int n, int depth) {
-    printf("%d", n);
-    if (n == 1) {
+    if (n < 1) {
       return NULL;
     }
 
-    struct record* sorted_rs = malloc(sizeof(struct record));
-    sorted_rs = rs;
-
     struct node *nd = malloc(sizeof(struct node));
-
+    
     nd->axis = depth % 2;
     if (nd->axis == 0) {
-      qsort(&sorted_rs, n, sizeof(struct record*), compare_lon);
+      qsort(rs, n, sizeof(struct record), compare_lon);
     } else {
-      qsort(&sorted_rs, n, sizeof(struct record*), compare_lat);
+      qsort(rs, n, sizeof(struct record), compare_lat);
     }
+    nd->rs = &rs[(n + 1)/2];
 
-    nd->rs = &rs[n/2];
-    struct record* before_median = malloc((n - n/2) * sizeof(struct record*));
-    struct record* after_median = malloc((n - n/2 - 1) * sizeof(struct record*));
-    for (int i = 0; i > n/2 - 1; i++) {
-      before_median[i] = sorted_rs[i];
-    }
-    for (int i = n/2 + 1; i > n - 1; i++) {
-      after_median[i] = sorted_rs[i];
-    }
+    nd->left = construction(rs, (n + 1)/2 - 1, depth + 1);
 
-    free(sorted_rs);
-
-    nd->left = construction(before_median, n/2 - 1, depth + 1);
-    if (n % 2 == 0) {
-      nd->right = construction(after_median, n/2 - 1, depth + 1);
+    if ((n + 1) % 2 == 0) {
+      nd->right = construction(rs + n, (n + 1)/2 - 2, depth + 1);
     } else {
-      nd->right = construction(after_median, n/2, depth + 1);
+      nd->right = construction(rs + n, (n + 1)/2 - 1, depth + 1);
     }
-    
-    free(before_median);
-    free(after_median);
+
     return nd;
 }
 
