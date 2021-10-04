@@ -30,14 +30,16 @@ const struct record* lookup_naive(struct naive_data *data, double lon, double la
   double lon_data = data->rs[0].lon;
   double lat_data = data->rs[0].lat;
   double current_smallest_dist = sqrt(pow(lon_data - lon, 2.0) + pow(lat_data - lat, 2.0));
-  const struct record* current_record = data->rs;
+  const struct record* current_record = &data->rs[0];
+
   for (int i = 1; i < data->n - 1; i++) {
     lon_data = data->rs[i].lon;
     lat_data = data->rs[i].lat;
     double current_dist_i = sqrt(pow(lon_data - lon, 2.0) + pow(lat_data - lat, 2.0));
+    
     if (current_dist_i < current_smallest_dist) {
       current_smallest_dist = current_dist_i;
-      current_record = data->rs;
+      current_record = &data->rs[i];
     }
   }
   return current_record;

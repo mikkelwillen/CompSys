@@ -25,7 +25,7 @@ struct indexed_data* mk_indexed(struct record* rs, int n) {
     id->n = n;
     id->irs = malloc(sizeof(struct index_record) * n);
     for (int i = 0; i < n - 1; i++) {
-        id->irs[i].record = rs;
+        id->irs[i].record = &rs[i];
         id->irs[i].osm_id = rs[i].osm_id;
     }
     return id;
