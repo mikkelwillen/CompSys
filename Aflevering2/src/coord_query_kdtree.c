@@ -11,11 +11,11 @@
 #include "coord_query.h"
 
 struct node {
-    struct record *rs;
+    struct record* rs;
     double point;
     int axis;
-    struct node *left;
-    struct node *right;
+    struct node* left;
+    struct node* right;
 };
 
 int compare_lon(struct record *arg1, struct record *arg2) {
@@ -56,8 +56,46 @@ struct node* construction(struct record *rs, int n, int depth) {
     } else {
       nd->right = construction(rs + n, (n + 1)/2 - 1, depth + 1);
     }
-
+    
     return nd;
+}
+
+void free_rec(struct node *data) {
+  if (data != NULL) {
+    free_rec(data->left);
+    free_rec(data->right);
+    free(data);
+  }
+}
+
+const struct record* lookup_rec(struct node *data, double lon, double lat, double current_smallest, const struct record* current_rs) {
+  if (data == NULL) {
+    return current_rs;
+  }
+  double lon_data = data->rs[0].lon;
+  double lat_data = data->rs[0].lat;
+  double new_smallest = sqrt(pow(lon_data - lon, 2.0) + pow(lat_data - lat, 2.0));
+  const struct record* new_record = data->rs;
+  double diff = 0.0;
+  if (data->axis == 0) {
+    diff = lon_data - lon;
+  } else {
+    diff = lat_data - lat;
+  }
+  if(new_smallest < current_smallest) {
+    if (diff >= 0 && new_smallest > fabs(diff)) {
+      return lookup_rec(data->left, lon, lat, new_smallest, new_record);
+    } else if (diff <= 0 && new_smallest > fabs(diff)) {
+      return lookup_rec(data->right, lon, lat, new_smallest, new_record);
+    }
+  } else {
+    if (diff >= 0 && new_smallest > fabs(diff)) {
+      return lookup_rec(data->left, lon, lat, current_smallest, current_rs);
+    } else if (diff <= 0 && new_smallest > fabs(diff)) {
+      return lookup_rec(data->right, lon, lat, current_smallest, current_rs);
+    }
+  }
+  return current_rs;
 }
 
 struct node* mk_kdtree(struct record* rs, int n) {
@@ -65,25 +103,31 @@ struct node* mk_kdtree(struct record* rs, int n) {
 }
 
 void free_kdtree(struct node *data) {
-  free(data);
+  free_rec(data);
 }
 
 const struct record* lookup_kdtree(struct node *data, double lon, double lat) {
-  // double lon_data = data->rs[0].lon;
-  // double lat_data = data->rs[0].lat;
-  // double current_smallest_dist = sqrt(pow(lon_data - lon, 2.0) + pow(lat_data - lat, 2.0));
-  // const struct record* current_record = data->rs;
-  // for (int i = 1; i < data->n - 1; i++) {
-  //   lon_data = data->rs[i].lon;
-  //   lat_data = data->rs[i].lat;
-  //   double current_dist_i = sqrt(pow(lon_data - lon, 2.0) + pow(lat_data - lat, 2.0));
-  //   if (current_dist_i < current_smallest_dist) {
-  //     current_smallest_dist = current_dist_i;
-  //     current_record = data->rs;
-  //   }
-  // }
-  // return current_record;
-  assert(1);
+  if (data == NULL) {
+    return data->rs;
+  }
+  double lon_data = data->rs[0].lon;
+  double lat_data = data->rs[0].lat;
+  double new_smallest = sqrt(pow(lon_data - lon, 2.0) + pow(lat_data - lat, 2.0));
+  const struct record* new_record = data->rs;
+  double diff = 0.0;
+  if (data->axis == 0) {
+    diff = lon_data - lon;
+  } else {
+    diff = lat_data - lat;
+  }
+
+  if (diff >= 0 && new_smallest > fabs(diff)) {
+    return lookup_rec(data->left, lon, lat, new_smallest, new_record);
+  } else if (diff < 0 && new_smallest > fabs(diff)) {
+    return lookup_rec(data->right, lon, lat, new_smallest, new_record);
+  }
+
+  return new_record;
 }
 
 int main(int argc, char** argv) {
