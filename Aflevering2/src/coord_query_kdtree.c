@@ -18,6 +18,11 @@ struct node {
     struct node* right;
 };
 
+struct lookup {
+  double radius;
+  struct node* closest;
+};
+
 int compare_lon(struct record *arg1, struct record *arg2) {
     if (arg1->lon > arg2->lon)
         return 1;
@@ -35,7 +40,7 @@ int compare_lat(struct record *arg1, struct record *arg2) {
 }
 
 struct node* construction(struct record *rs, int n, int depth) {
-    if (n < 1) {
+    if (n < 0) {
       return NULL;
     }
 
@@ -56,7 +61,7 @@ struct node* construction(struct record *rs, int n, int depth) {
     } else {
       nd->right = construction(rs + n, (n + 1)/2 - 1, depth + 1);
     }
-    
+
     return nd;
 }
 
@@ -68,34 +73,32 @@ void free_rec(struct node *data) {
   }
 }
 
-const struct record* lookup_rec(struct node *data, double lon, double lat, double current_smallest, const struct record* current_rs) {
+void lookup_rec(struct node *data, double lon, double lat, struct lookup* lookupdata) {
   if (data == NULL) {
-    return current_rs;
-  }
-  double lon_data = data->rs[0].lon;
-  double lat_data = data->rs[0].lat;
-  double new_smallest = sqrt(pow(lon_data - lon, 2.0) + pow(lat_data - lat, 2.0));
-  const struct record* new_record = data->rs;
-  double diff = 0.0;
-  if (data->axis == 0) {
-    diff = lon_data - lon;
+    
   } else {
-    diff = lat_data - lat;
-  }
-  if(new_smallest < current_smallest) {
-    if (diff >= 0 && new_smallest > fabs(diff)) {
-      return lookup_rec(data->left, lon, lat, new_smallest, new_record);
-    } else if (diff <= 0 && new_smallest > fabs(diff)) {
-      return lookup_rec(data->right, lon, lat, new_smallest, new_record);
+    double lon_data = data->rs[0].lon;
+    double lat_data = data->rs[0].lat;
+    double new_smallest = sqrt(pow(fabs(lon_data - lon), 2.0) + pow(fabs(lat_data - lat), 2.0));
+    double diff = 0.0;
+    if (data->axis == 0) {
+      diff = lon_data - lon;
+    } else {
+      diff = lat_data - lat;
     }
-  } else {
-    if (diff >= 0 && new_smallest > fabs(diff)) {
-      return lookup_rec(data->left, lon, lat, current_smallest, current_rs);
-    } else if (diff <= 0 && new_smallest > fabs(diff)) {
-      return lookup_rec(data->right, lon, lat, current_smallest, current_rs);
+
+    if (new_smallest < lookupdata->radius) {
+      lookupdata->radius = new_smallest;
+      lookupdata->closest = data;
+    }
+    printf("%s\n", lookupdata->closest->rs->display_name);
+    if (diff >= 0 || lookupdata->radius > fabs(diff)) {
+      lookup_rec(data->left, lon, lat, lookupdata);
+    }
+    if (diff <= 0 || lookupdata->radius > fabs(diff)) {
+      lookup_rec(data->right, lon, lat, lookupdata);
     }
   }
-  return current_rs;
 }
 
 struct node* mk_kdtree(struct record* rs, int n) {
@@ -110,10 +113,12 @@ const struct record* lookup_kdtree(struct node *data, double lon, double lat) {
   if (data == NULL) {
     return data->rs;
   }
+  
+  struct lookup* lookupdata = malloc(sizeof(struct lookup));
   double lon_data = data->rs[0].lon;
   double lat_data = data->rs[0].lat;
-  double new_smallest = sqrt(pow(lon_data - lon, 2.0) + pow(lat_data - lat, 2.0));
-  const struct record* new_record = data->rs;
+  lookupdata->radius = sqrt(pow(fabs(lon_data - lon), 2.0) + pow(fabs(lat_data - lat), 2.0));
+  lookupdata->closest = data;
   double diff = 0.0;
   if (data->axis == 0) {
     diff = lon_data - lon;
@@ -121,13 +126,14 @@ const struct record* lookup_kdtree(struct node *data, double lon, double lat) {
     diff = lat_data - lat;
   }
 
-  if (diff >= 0 && new_smallest > fabs(diff)) {
-    return lookup_rec(data->left, lon, lat, new_smallest, new_record);
-  } else if (diff < 0 && new_smallest > fabs(diff)) {
-    return lookup_rec(data->right, lon, lat, new_smallest, new_record);
+  if (diff >= 0 || lookupdata->radius > fabs(diff)) {
+    lookup_rec(data->left, lon, lat, lookupdata);
+  } 
+  if (diff <= 0 || lookupdata->radius > fabs(diff)) {
+    lookup_rec(data->right, lon, lat, lookupdata);
   }
 
-  return new_record;
+  return lookupdata->closest->rs;
 }
 
 int main(int argc, char** argv) {
