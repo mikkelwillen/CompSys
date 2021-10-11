@@ -24,17 +24,17 @@ struct lookup {
 };
 
 int compare_lon(struct record *arg1, struct record *arg2) {
-    if (arg1->lon > arg2->lon)
+    if (arg1->lon > arg2->lon) {
         return 1;
-    else {
+    } else {
         return -1;
     }
 }
 
 int compare_lat(struct record *arg1, struct record *arg2) {
-    if (arg1->lat > arg2->lat)
+    if (arg1->lat > arg2->lat) {
         return 1;
-    else {
+    } else {
         return -1;
     }
 }
@@ -57,9 +57,9 @@ struct node* construction(struct record *rs, int n, int depth) {
     nd->left = construction(rs, (n + 1)/2 - 1, depth + 1);
 
     if ((n + 1) % 2 == 0) {
-      nd->right = construction(rs, (n + 1)/2 - 2, depth + 1);
+      nd->right = construction(rs + n, (n + 1)/2 - 2, depth + 1);
     } else {
-      nd->right = construction(rs, (n + 1)/2 - 1, depth + 1);
+      nd->right = construction(rs + n, (n + 1)/2 - 1, depth + 1);
     }
 
     return nd;
