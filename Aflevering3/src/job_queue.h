@@ -6,13 +6,13 @@
 struct job_queue {
   int capacity;
   int current_jobs;
-  struct job** job_stack;
+  struct job* head;
 };
 
 struct job {
   void* data;
+  struct job* next;
 };
-
 
 // Initialise a job queue with the given capacity.  The queue starts out
 // empty.  Returns non-zero on error.
