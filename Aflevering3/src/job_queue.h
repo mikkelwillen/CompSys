@@ -7,6 +7,9 @@ struct job_queue {
   int capacity;
   int current_jobs;
   struct job* head;
+  pthread_mutex_t mutex;
+  pthread_cond_t empty, fill;
+  int destroyed;
 };
 
 struct job {
