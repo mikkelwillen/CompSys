@@ -20,6 +20,8 @@
 
 #include "job_queue.h"
 
+pthread_mutex_t stdout_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 struct fauxjob {
   char const* needle;
   char const* path;
@@ -39,7 +41,9 @@ int fauxgrep_file(char const *needle, char const *path) {
 
   while (getline(&line, &linelen, f) != -1) {
     if (strstr(line, needle) != NULL) {
+      assert(pthread_mutex_lock(&stdout_mutex) == 0);
       printf("%s:%d: %s", path, lineno, line);
+      assert(pthread_mutex_unlock(&stdout_mutex) == 0);
     }
 
     lineno++;
@@ -58,6 +62,8 @@ void* worker(void* arg) {
     struct fauxjob* data;
     if (job_queue_pop(jq, (void**)&data) == 0) {
       fauxgrep_file(data->needle, data->path);
+      free(data->needle);
+      free(data->path);
       free(data);
     } else {
       break;
@@ -71,12 +77,12 @@ int main(int argc, char * const *argv) {
     err(1, "usage: [-n INT] STRING paths...");
     exit(1);
   }
-
+  printf("hej1 \n");
   int num_threads = 1;
   char const *needle = argv[1];
   char * const *paths = &argv[2];
 
-
+  printf("hej2\n");
   if (argc > 3 && strcmp(argv[1], "-n") == 0) {
     // Since atoi() simply returns zero on syntax errors, we cannot
     // distinguish between the user entering a zero, or some
@@ -98,11 +104,13 @@ int main(int argc, char * const *argv) {
     paths = &argv[2];
   }
 
+  printf("hej3\n");
   struct job_queue jq;
   job_queue_init(&jq, 64);
 
   pthread_t* threads = calloc(num_threads, sizeof(pthread_t));
   for (int i = 0; i < num_threads; i++) {
+    printf("hej7\n");
     if (pthread_create(&threads[i], NULL, &worker, &jq) != 0) {
       err(1, "pthread_create() failed");
     }
@@ -122,25 +130,36 @@ int main(int argc, char * const *argv) {
     return -1;
   }
 
+  struct fauxjob* fauxdata = malloc(sizeof(struct fauxjob));
   FTSENT *p;
   while ((p = fts_read(ftsp)) != NULL) {
     switch (p->fts_info) {
     case FTS_D:
       break;
-    case FTS_F:
-      struct fauxjob* data = malloc(sizeof(struct fauxjob));
-      data->needle = needle;
-      data->path = p->fts_path;
-      job_queue_push(&jq, (void*)data);
+    case FTS_F:      
+      printf("hej8\n");
+      fauxdata->needle = strdup(needle);
+      printf("hej9\n");
+      fauxdata->path = strdup(p->fts_path);
+      printf("hej10\n");
+      job_queue_push(&jq, (void*)fauxdata);
+      printf("hej5\n");
       break;
     default:
       break;
     }
   }
 
+
   fts_close(ftsp);
 
-  assert(0); // Shut down the job queue and the worker threads here.
+  job_queue_destroy(&jq);
 
+  for (int i = 0; i < num_threads; i++) {
+    if (pthread_join(threads[i], NULL) != 0) {
+      err(1, "pthread_join() failed");
+    }
+  }
+  free(threads);
   return 0;
 }
