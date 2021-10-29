@@ -144,6 +144,7 @@ int main(int argc, char * const *argv) {
       err(1, "pthread_join() failed");
     }
   }
+  
   free(threads);
   return 0;
 }

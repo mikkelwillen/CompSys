@@ -71,6 +71,7 @@ void* worker(void* arg) {
       break;
     }
   }
+  return NULL;
 }
 
 int main(int argc, char * const *argv) {
@@ -137,6 +138,8 @@ int main(int argc, char * const *argv) {
   }
 
   fts_close(ftsp);
+
+  job_queue_destroy(&jq);
 
   for (int i = 0; i < num_threads; i++) {
     if(pthread_join(threads[i], NULL) != 0) {
