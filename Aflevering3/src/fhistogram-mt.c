@@ -103,6 +103,8 @@ int main(int argc, char * const *argv) {
   for (int i = 0; i < num_threads; i++) {
     if (pthread_create(&threads[i], NULL, &worker, &jq) != 0) {
       err(1, "pthread_create() failed");
+    } else {
+      print_histogram(global_histogram);
     }
   }
 
