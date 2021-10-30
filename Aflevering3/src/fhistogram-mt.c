@@ -149,6 +149,8 @@ int main(int argc, char * const *argv) {
     }
   }
 
+  free(threads);
+
   move_lines(9);
 
   return 0;
