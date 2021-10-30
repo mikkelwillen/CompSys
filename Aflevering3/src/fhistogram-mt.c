@@ -141,8 +141,6 @@ int main(int argc, char * const *argv) {
 
   job_queue_destroy(&jq);
 
-  free(&jq);
-
   for (int i = 0; i < num_threads; i++) {
     if(pthread_join(threads[i], NULL) != 0) {
       err(1, "pthread_join() failed");

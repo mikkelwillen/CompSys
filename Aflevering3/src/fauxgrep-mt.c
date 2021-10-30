@@ -59,6 +59,7 @@ void* worker(void* arg) {
     char* line;
     if (job_queue_pop(jq, (void**)&line) == 0) {
       fauxgrep_file(global_needle, line);
+      free(line);
     } else {
       break;
     }
@@ -139,7 +140,6 @@ int main(int argc, char * const *argv) {
 
   job_queue_destroy(&jq);
 
-  free(&jq);
 
   for (int i = 0; i < num_threads; i++) {
     if (pthread_join(threads[i], NULL) != 0) {
