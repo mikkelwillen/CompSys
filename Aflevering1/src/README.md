@@ -1,3 +1,0 @@
-# CompSys
-
-Aflevering 1.
