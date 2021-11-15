@@ -20,7 +20,7 @@ struct RequestHeader
   char protocol[4];
   unsigned int version; 
   unsigned int command; 
-  unsigned int length; 
+  unsigned int length;
 };
 
 struct RequestBody

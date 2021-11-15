@@ -89,7 +89,7 @@ void download_only_peer(char *cascade_file)
     int uncomp_count = (int) sizeof(missing_blocks)/sizeof(missing_blocks[0]);
     
     /*
-    TODO Compute the hash of the cascade file
+    TODO - DONE Compute the hash of the cascade file
     HINT: Do not implement hashing from scratch. Use the provided 'get_file_sha' function
     */
     char hash_buf[SHA256_HASH_SIZE];
@@ -378,8 +378,12 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash, char* tracker_ip, ch
     int tracker_socket;
     
     /*
-    TODO Setup a connection to the tracker
+    TODO - DONE Setup a connection to the tracker
     */
+    tracker_socket = Open_clientfd(tracker_ip, tracker_port);
+    Rio_readinitb(&rio, tracker_socket);
+
+
 
     struct RequestHeader request_header;
     strncpy(request_header.protocol, "CASC", 4);
@@ -389,9 +393,16 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash, char* tracker_ip, ch
     memcpy(rio_buf, &request_header, HEADER_SIZE);
 
     /*
-    TODO Complete the peer list request and 
+    TODO -DONE Complete the peer list request and 
     HINT The header has been provided above as a guide
     */
+    struct RequestBody request_body;
+    strncpy(request_body.hash, hash, 32);
+    request_body.ip.s_addr = (uint32_t) strtol(my_ip, NULL, 10);
+    request_body.port = (unsigned short) strtol(my_port, NULL, 10);
+    memcpy(rio_buf + HEADER_SIZE, &request_body, BODY_SIZE);
+    
+
     
     Rio_writen(tracker_socket, rio_buf, MESSAGE_SIZE);
 
