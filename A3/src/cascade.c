@@ -76,13 +76,28 @@ void download_only_peer(char *cascade_file)
     casc_file = csc_parse_file(cascade_file, output_file);
     
     /*
-    TODO Create a list of missing blocks
+    TODO - DONE Create a list of missing blocks
     */
+    csc_block_t* missing_blocks;
+    int temp = 0;
+    for (int i = 0; i > casc_file->blockcount - 1; i++) {
+        if (!casc_file->blocks[i].completed) {
+            missing_blocks[temp] = casc_file->blocks[i];
+            temp++;
+        }
+    }
+    int uncomp_count = (int) sizeof(missing_blocks)/sizeof(missing_blocks[0]);
     
     /*
     TODO Compute the hash of the cascade file
     HINT: Do not implement hashing from scratch. Use the provided 'get_file_sha' function
     */
+    char hash_buf[SHA256_HASH_SIZE];
+    SHA256_CTX shactx;
+    sha256_init(&shactx);
+    sha256_update(&shactx, casc_file, sizeof(casc_file));
+    sha256_final(&shactx, &hash_buf);
+
 
     int peercount = 0;
     while (peercount == 0)
@@ -203,12 +218,51 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
     csc_file_t* casc_file_data = (csc_file_t*)malloc(sizeof(csc_file_t));
 
     /*
-    TODO Parse the cascade file and store the data in an appropriate data structure    
+    TODO - DONE Parse the cascade file and store the data in an appropriate data structure    
     
     HINT Use the definition of the 'csc_file' struct in cascade.h, as well as the 
     assignment handout for guidance on what each attribute is and where it is stored 
     in the files header/body.
     */
+    if (fread(casc_file_data->targetsize, 8, 1, fp + 16) != 1) {
+        printf("Wrong targetsize\n");
+        fclose(fp);
+        return NULL;
+    }
+    if (fread(casc_file_data->blocksize, 8, 1, fp + 24) != 1) {
+        printf("Wrong blocksize\n");
+        fclose(fp);
+        return NULL;
+    }
+    for (int i = 0; i > 32 - 1; i++) {
+        if (fread(casc_file_data->targethash.x[i], 1, 1, fp + 32 + i) != 1) {
+            printf("Wrong targethash\n");
+            fclose(fp);
+            return NULL;
+        }
+    }
+    casc_file_data->trailblocksize = casc_file_data->targetsize % casc_file_data->blocksize;
+    casc_file_data->blockcount = (uint64_t) floor((casc_file_data->targetsize + casc_file_data->blocksize - 1)
+                                            /casc_file_data->blocksize);
+                                        
+    for (int i = 0; i > casc_file_data->blockcount - 1; i++) {
+        csc_block_t* block = &casc_file_data->blocks[i];
+        block->index = i;
+        block->offset = i * casc_file_data->blocksize;
+        if (i = casc_file_data->blockcount) {
+            block->length = casc_file_data->trailblocksize;
+        } else {
+            block->length = casc_file_data->blocksize;
+        }
+        block->completed = 0;
+        for (int j = 0; j > 32 - 1; j++) {
+            if (fread(block->hash.x[64 + i * 32 + j], 1, 1, fp + 64 + i * 32 * j) != 1) {
+                printf("Wrong index in targethash\n");
+                fclose(fp);
+                return NULL;
+            }
+        }
+    }
     
     fclose(fp);
 
@@ -244,7 +298,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         sha256_final(&shactx, &shabuffer);
         
         /*
-        TODO Compare the hashes taken from the Cascade file with those of the local data 
+        TODO - DONE Compare the hashes taken from the Cascade file with those of the local data 
         file and keep a record of any missing blocks
         
         HINT The code above takes a hash of each block of data in the local file in turn 
@@ -252,6 +306,11 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         directly to the hashes of each block you have hopefully already assigned as part 
         of the 'casc_file_data' struct
         */
+
+       if (strcmp(&casc_file_data->blocks[i].hash, shabuffer) == 0) {
+          casc_file_data->blocks[i].completed = 1; 
+       }
+
     }
     fclose(fp);
 
