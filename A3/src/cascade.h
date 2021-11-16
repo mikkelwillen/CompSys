@@ -14,13 +14,12 @@
 #define PEER_RESPONSE_HEADER_SIZE   9
 #define MAX_LINE                    128
 
-
 struct RequestHeader
 {
   char protocol[4];
   unsigned int version; 
   unsigned int command; 
-  unsigned int length;
+  unsigned int length; 
 };
 
 struct RequestBody
@@ -111,5 +110,8 @@ int csc_get_peers(csc_ipport_t tracker, csc_hashdata_t cascadehash, csc_ipport_t
  * If the function fails, the return code is non-zero, and will reflect the peer statuscode (if given).
  */
 int csc_download_block(csc_ipport_t client, csc_hashdata_t cascadehash, uint64_t blockno, uint64_t blocklength, void* buffer);
+
+int get_peers_list(csc_peer_t** peers, unsigned char* hash);
+void get_block(csc_block_t* block, csc_peer_t peer, unsigned char* hash, char* output_file);
 
 #endif

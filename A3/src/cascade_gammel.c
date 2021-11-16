@@ -23,9 +23,6 @@ struct csc_file *casc_file;
 csc_block_t** queue;
 csc_peer_t* peers;
 
-/*
- * Frees global resources that are malloc'ed during peer downloads. 
- */
 void free_resources()
 {
     free(queue);
@@ -33,13 +30,7 @@ void free_resources()
     csc_free_file(casc_file);
 }
 
-/*
- * Gets a sha256 hash of a specified file, sourcefile. The hash itself is 
- * placed into the given variable 'hash'. Any size can be created, but a
- * a normal size for the hash would be given by the global variable 
- * 'SHA256_HASH_SIZE', that has been defined in sha256.h
- */
-void get_file_sha(const char* sourcefile, char* hash, int size)
+unsigned char* get_file_sha(const char* sourcefile, csc_file_t* res, char* hash, int size)
 {
     int casc_file_size;
 
@@ -47,7 +38,7 @@ void get_file_sha(const char* sourcefile, char* hash, int size)
     if (fp == 0)
     {
         printf("Failed to open source: %s\n", sourcefile);
-        return;
+        return NULL;
     }
     
     fseek(fp, 0L, SEEK_END);
@@ -58,34 +49,18 @@ void get_file_sha(const char* sourcefile, char* hash, int size)
     fread(buffer, casc_file_size, 1, fp); 
     fclose(fp);
     
-    get_data_sha(buffer, hash, casc_file_size, size);
-}
-
-/*
- * Gets a sha256 hash of specified data, sourcedata. The hash itself is 
- * placed into the given variable 'hash'. Any size can be created, but a
- * a normal size for the hash would be given by the global variable 
- * 'SHA256_HASH_SIZE', that has been defined in sha256.h
- */
-void get_data_sha(const char* sourcedata, char* hash, uint32_t data_size, int hash_size)
-{    
     SHA256_CTX shactx;
-    unsigned char shabuffer[hash_size];
+    unsigned char shabuffer[size];
     sha256_init(&shactx);
-    sha256_update(&shactx, sourcedata, data_size);
-    sha256_final(&shactx, &shabuffer);
+    sha256_update(&shactx, buffer, casc_file_size);
+    sha256_final(&shactx, shabuffer);
     
-    for (int i=0; i<hash_size; i++)
+    for (int i = 0; i < size; i++)
     {
         hash[i] = shabuffer[i];
     }
 }
 
-/*
- * Perform all client based interactions in the P2P network for a given cascade file.
- * E.g. parse a cascade file and get all the relevent data from somewhere else on the 
- * network.
- */
 void download_only_peer(char *cascade_file)
 {
     printf("Managing download only for: %s\n", cascade_file);    
@@ -104,13 +79,8 @@ void download_only_peer(char *cascade_file)
        
     casc_file = csc_parse_file(cascade_file, output_file);
     
-    int uncomp_count = 0;
-    queue = malloc(casc_file->blockcount * sizeof(csc_block_t*));
-
     /*
-    TODO Create a list of missing blocks
-
-    HINT: Use the already allocated 'csc_block_t** queue' for the list, and keep count of missing blocks in 'uncomp_cont'.
+    TODO - DONE Create a list of missing blocks
     */
     csc_block_t* missing_blocks;
     int temp = 0;
@@ -120,13 +90,12 @@ void download_only_peer(char *cascade_file)
             temp++;
         }
     }
-    uncomp_count = (int) sizeof(missing_blocks)/sizeof(missing_blocks[0]);
+    int uncomp_count = (int) sizeof(missing_blocks)/sizeof(missing_blocks[0]);
     queue = &missing_blocks;
     printf("Missing blocks\n");
-
+    
     /*
-    TODO Compute the hash of the cascade file
-
+    TODO - DONE Compute the hash of the cascade file
     HINT: Do not implement hashing from scratch. Use the provided 'get_file_sha' function
     */
     char hash_buf[SHA256_HASH_SIZE];
@@ -136,10 +105,11 @@ void download_only_peer(char *cascade_file)
     sha256_final(&shactx, &hash_buf);
     printf("Sha af cascade\n");
 
+
     int peercount = 0;
     while (peercount == 0)
     {
-        peercount = get_peers_list(&peers, hash_buf);
+        peercount = get_peers_list(&peers, hash_buf, tracker_ip, tracker_port, my_ip, my_port);
         if (peercount == 0)
         {
             printf("No peers were found. Will try again in %d seconds\n", PEER_REQUEST_DELAY);
@@ -170,9 +140,6 @@ void download_only_peer(char *cascade_file)
     free_resources();
 }
 
-/*
- * Count how many times a character occurs in a string
- */
 int count_occurences(char string[], char c)
 {
     int i=0;
@@ -188,9 +155,6 @@ int count_occurences(char string[], char c)
 }
 
 // Adapted from: https://stackoverflow.com/a/35452093/
-/*
- *  Convert a string of hexidecimal into a string of bytes
- */
 uint8_t* hex_to_bytes(const char* string) {
 
     if(string == NULL) 
@@ -260,21 +224,13 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
 
     csc_file_t* casc_file_data = (csc_file_t*)malloc(sizeof(csc_file_t));
 
-    casc_file_data->targetsize = be64toh(*((unsigned long long*)&header[16]));
-    casc_file_data->blocksize = be64toh(*((unsigned long long*)&header[24]));
-
-    
-    
     /*
-    TODO Parse the cascade file and store the data in an appropriate data structure    
+    TODO - DONE Parse the cascade file and store the data in an appropriate data structure    
     
     HINT Use the definition of the 'csc_file' struct in cascade.h, as well as the 
     assignment handout for guidance on what each attribute is and where it is stored 
     in the files header/body.
     */
-
-    // kig på den ovenover
-
     if (fread(casc_file_data->targetsize, 8, 1, fp + 16) != 1) {
         printf("Wrong targetsize\n");
         fclose(fp);
@@ -350,7 +306,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         sha256_final(&shactx, &shabuffer);
         
         /*
-        TODO Compare the hashes taken from the Cascade file with those of the local data 
+        TODO - DONE Compare the hashes taken from the Cascade file with those of the local data 
         file and keep a record of any missing blocks
         
         HINT The code above takes a hash of each block of data in the local file in turn 
@@ -358,6 +314,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         directly to the hashes of each block you have hopefully already assigned as part 
         of the 'casc_file_data' struct
         */
+
        if (strcmp(&casc_file_data->blocks[i].hash, shabuffer) == 0) {
           casc_file_data->blocks[i].completed = 1; 
        }
@@ -379,29 +336,32 @@ void csc_free_file(csc_file_t* file)
     free(file);
 }
 
-/*
- * Get a specified block from a peer on the network. The block is retrieved and then inserted directly into
- * the appropriate data file at the appropriate location.
- */
+size_t readbytes(int sock, void* buffer, size_t count)
+{
+    size_t remaining = count;
+    while(remaining > 0)
+    {
+        size_t read = recv(sock, buffer, remaining, NULL);
+        if (read == 0)
+            return 0;
+        buffer += read;
+        remaining -= read;
+    }
+
+    return count;
+}
+
 void get_block(csc_block_t* block, csc_peer_t peer, unsigned char* hash, char* output_file)
 {
     printf("Attempting to get block %d from %s:%s for %s\n", block->index, peer.ip, peer.port, output_file);
     
     rio_t rio;    
-    char rio_buf[MAXLINE];
+    char rio_buf[MAX_LINE];
     int peer_socket;
     
     /*
-    TODO Request a block from a peer
-    
-    HINT: Remember that integers sent over a network in TCP are done so in network byte order (big-endian) and 
-    will need to be converted to a more useful format.
-    
-    HINT: Remember to check that the data you have recieved is the data you expect. You can check this as you
-    should already have a hash of block in block->hash, and you can get the hash of the data you just read by
-    using the function 'get_data_sha'
+    TODO - DONE Request a block from a peer
     */
-    
     peer_socket = Open_clientfd(peer.ip, peer.port);
     Rio_readinitb(&rio, peer_socket);
 
@@ -470,26 +430,19 @@ void get_block(csc_block_t* block, csc_peer_t peer, unsigned char* hash, char* o
     Close(peer_socket);
 }
 
-
-/*
- * Get a list of peers on the network from a tracker. Note that this query is doing double duty according to
- * the protocol, and by asking for a list of peers we are also enrolling on the network ourselves.
- */
-int get_peers_list(csc_peer_t** peers, unsigned char* hash)
+int get_peers_list(csc_peer_t** peers, unsigned char* hash, char* tracker_ip, char* tracker_port, char* my_ip, char* my_port)
 {
     rio_t rio;    
-    char rio_buf[MAXLINE];
+    char rio_buf[MAX_LINE];
     int tracker_socket;
     
     /*
-    TODO Setup a connection to the tracker
-    
-    HINT: Remember that as well as making a connection, you'll also need to initialise a buffer for messages
+    TODO - DONE Setup a connection to the tracker
     */
-
     tracker_socket = Open_clientfd(tracker_ip, tracker_port);
     Rio_readinitb(&rio, tracker_socket);
-    printf("connection to tracker\n");
+
+
 
     struct RequestHeader request_header;
     strncpy(request_header.protocol, "CASC", 4);
@@ -497,23 +450,19 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
     request_header.command = htonl(1);
     request_header.length = htonl(BODY_SIZE);
     memcpy(rio_buf, &request_header, HEADER_SIZE);
+    printf("connection to tracker\n");
 
     /*
-    TODO Complete the peer list request
-
-    HINT: The header has been provided above as a guide
-
-    HINT: Take another look the specification of the Tracker API in the
-          assingment text and at 'struct RequestBody' in cascade.h
-
-    HINT: The client ip, i.e., 'my_ip', is not in a very useful representation...
+    TODO - DONE Complete the peer list request and 
+    HINT The header has been provided above as a guide
     */
-
     struct RequestBody request_body;
     strncpy(request_body.hash, hash, 32);
     request_body.ip.s_addr = (uint32_t) strtol(my_ip, NULL, 10);
     request_body.port = (unsigned short) strtol(my_port, NULL, 10);
     memcpy(rio_buf + HEADER_SIZE, &request_body, BODY_SIZE);
+    
+
     
     Rio_writen(tracker_socket, rio_buf, MESSAGE_SIZE);
 
@@ -521,7 +470,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
     
     char reply_header[REPLY_HEADER_SIZE];
     memcpy(reply_header, rio_buf, REPLY_HEADER_SIZE);
-    printf("list of peers request completed\n");  
+    printf("list of peers request completed\n");
 
     uint32_t msglen = ntohl(*(uint32_t*)&reply_header[1]);
     if (msglen == 0)
@@ -540,7 +489,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
             return NULL;
         }
         memset(error_buf, 0, msglen + 1);
-        memcpy(error_buf, &rio_buf[REPLY_HEADER_SIZE], msglen); // Fixed by Rune
+        memcpy(reply_header, error_buf, msglen);
         printf("Tracker gave error: %d - %s\n", reply_header[0], error_buf);
         free(error_buf);
         Close(tracker_socket);
@@ -555,7 +504,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
     }
     
     /*
-    TODO Parse the body of the response to get a list of peers
+    TODO - DONE Parse the body of the response to get a list of peers
     
     HINT Some of the later provided code expects the peers to be stored in the ''peers' variable, which 
     is an array of 'csc_peer's, as defined in cascade.h
@@ -594,9 +543,6 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
     return peercount;
 }
 
-/*
- * The entry point for the code. Parses command line arguments and starts up the appropriate peer code.
- */
 int main(int argc, char **argv) 
 {
     if (argc != MAIN_ARGNUM + 1) 
