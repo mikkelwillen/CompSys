@@ -1,7 +1,7 @@
 GCC=gcc -O3 -g -Wall -Wextra -pedantic -std=gnu11
 LD_FLAGS= -lpthread
 
-all: peer name_server cascade
+all: cascade
 
 rebuild: clean all
 

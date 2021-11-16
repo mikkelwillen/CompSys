@@ -87,6 +87,7 @@ void download_only_peer(char *cascade_file)
         }
     }
     int uncomp_count = (int) sizeof(missing_blocks)/sizeof(missing_blocks[0]);
+    queue = &missing_blocks;
     
     /*
     TODO - DONE Compute the hash of the cascade file
@@ -102,7 +103,7 @@ void download_only_peer(char *cascade_file)
     int peercount = 0;
     while (peercount == 0)
     {
-        peercount = get_peers_list(&peers, hash_buf, tracker_ip, tracker_port);
+        peercount = get_peers_list(&peers, hash_buf, tracker_ip, tracker_port, my_ip, my_port);
         if (peercount == 0)
         {
             printf("No peers were found. Will try again in %d seconds\n", PEER_REQUEST_DELAY);
@@ -351,24 +352,74 @@ void get_block(csc_block_t* block, csc_peer_t peer, unsigned char* hash, char* o
     int peer_socket;
     
     /*
-    TODO Request a block from a peer
+    TODO - DONE Request a block from a peer
     */
+    peer_socket = Open_clientfd(peer.ip, peer.port);
+    Rio_readinitb(&rio, peer_socket);
+
+    struct ClientRequest client_request;
+    strncpy(client_request.protocol, "CASCADE1", 8);
+    strncpy(client_request.reserved, "0000000000000000", 16);
+    client_request.block_num = htonl(block->index);
+    strncpy(client_request.hash, hash, 32);
+    memcpy(rio_buf, &client_request, PEER_REQUEST_HEADER_SIZE);
     
-    FILE* fp = fopen(output_file, "rb+");
-    if (fp == 0)
-    {
-        printf("Failed to open destination: %s\n", output_file);
+    Rio_writen(peer_socket, rio_buf, PEER_RESPONSE_HEADER_SIZE);
+
+    Rio_readnb(&rio, rio_buf, MAXLINE);
+    
+    int status_code;
+    memcpy(status_code, rio_buf, 1);
+    long response_length;
+    memcpy(response_length, rio_buf + 1, 8);
+
+    char received_block[response_length];
+    memcpy(received_block, rio_buf + 9, response_length);
+
+    if (status_code = 1) {
+        printf("Invalid hash\n");
         Close(peer_socket);
         return NULL;
     }
 
-    /*
-    TODO Write the block into the data file
-    */
+    if (status_code = 2) {
+        printf("Block not present\n");
+        Close(peer_socket);
+        return NULL;
+    }
+
+    if (status_code = 3) {
+        printf("Block number too large\n");
+        Close(peer_socket);
+        return NULL;
+    }
+
+    if (status_code = 4) {
+        printf("Failed to parse request\n");
+        Close(peer_socket);
+        return NULL;
+    }
     
-    printf("Got block %d. Wrote from %d to %d\n", block->index, block->offset, block->offset+write_count-1);
+    if (status_code = 0) {
+        FILE* fp = fopen(output_file, "rb+");
+        if (fp == 0) {
+            printf("Failed to open destination: %s\n", output_file);
+            Close(peer_socket);
+            return NULL;
+        }
+        /*
+        TODO - DONE Write the block into the data file
+        */
+        Fputs(received_block, fp);
+        fclose(fp);
+    } else {
+        printf("Unknown error\n");
+        Close(peer_socket);
+        return NULL;
+    }
+
+    printf("Got block %d. Wrote from %d to %d\n", block->index, block->offset, block->offset+response_length - 1);
     Close(peer_socket);
-    fclose(fp);
 }
 
 int get_peers_list(csc_peer_t** peers, unsigned char* hash, char* tracker_ip, char* tracker_port, char* my_ip, char* my_port)
@@ -393,7 +444,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash, char* tracker_ip, ch
     memcpy(rio_buf, &request_header, HEADER_SIZE);
 
     /*
-    TODO -DONE Complete the peer list request and 
+    TODO - DONE Complete the peer list request and 
     HINT The header has been provided above as a guide
     */
     struct RequestBody request_body;
@@ -443,11 +494,40 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash, char* tracker_ip, ch
     }
     
     /*
-    TODO Parse the body of the response to get a list of peers
+    TODO - DONE Parse the body of the response to get a list of peers
     
     HINT Some of the later provided code expects the peers to be stored in the ''peers' variable, which 
     is an array of 'csc_peer's, as defined in cascade.h
     */
+    int peercount = 0;
+    for (int i = 0; i > msglen / 12 - 1; i++) {
+        csc_peer_t peer;
+        if (fread(peer.ip, 4, 1, rio_buf + (i * 12)) != 1) {
+            printf("Wrong ip\n");
+            fclose(tracker_socket);
+            return NULL;
+        }
+
+        if (fread(peer.port, 2, 1, rio_buf + (i * 12 + 4)) != 1) {
+            printf("Wrong port\n");
+            fclose(tracker_socket);
+            return NULL;
+        }
+
+        if (fread(peer.lastseen, 4, 1, rio_buf + (i * 12 + 6)) != 1) {
+            printf("Wrong lastseen\n");
+            fclose(tracker_socket);
+            return NULL;
+        }
+
+        if (fread(peer.good, 1, 1, rio_buf + (i * 12 + 10)) != 1) {
+            printf("Wrong flag\n");
+            fclose(tracker_socket);
+            return NULL;
+        }
+        peercount++;
+        peers[i] = &peer;
+    }
 
     Close(tracker_socket);
     return peercount;

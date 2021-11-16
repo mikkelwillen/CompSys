@@ -33,7 +33,7 @@ struct RequestBody
 struct ClientRequest
 {
     char protocol[8];
-    char reserved[12];
+    char reserved[16];
     uint64_t block_num;
     char hash[32];
 };
