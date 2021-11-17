@@ -103,6 +103,7 @@ void download_only_peer(char *cascade_file)
     printf("Downloading to: %s\n", output_file);
        
     casc_file = csc_parse_file(cascade_file, output_file);
+    printf("Managed to parse the file\n");
     
     int uncomp_count = 0;
     queue = malloc(casc_file->blockcount * sizeof(csc_block_t*));
@@ -130,11 +131,12 @@ void download_only_peer(char *cascade_file)
     HINT: Do not implement hashing from scratch. Use the provided 'get_file_sha' function
     */
     char hash_buf[SHA256_HASH_SIZE];
-    SHA256_CTX shactx;
-    sha256_init(&shactx);
-    sha256_update(&shactx, casc_file, sizeof(casc_file));
-    sha256_final(&shactx, &hash_buf);
-    printf("Sha af cascade\n");
+    get_file_sha(cascade_file,hash_buf,SHA256_HASH_SIZE);
+    //SHA256_CTX shactx;
+    //sha256_init(&shactx);
+    //sha256_update(&shactx, casc_file, sizeof(casc_file));
+    //sha256_final(&shactx, &hash_buf);
+    //printf("Sha af cascade\n");
 
     int peercount = 0;
     while (peercount == 0)
@@ -274,17 +276,6 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
     */
 
     // kig på den ovenover
-
-    if (fread(casc_file_data->targetsize, 8, 1, fp + 16) != 1) {
-        printf("Wrong targetsize\n");
-        fclose(fp);
-        return NULL;
-    }
-    if (fread(casc_file_data->blocksize, 8, 1, fp + 24) != 1) {
-        printf("Wrong blocksize\n");
-        fclose(fp);
-        return NULL;
-    }
     for (int i = 0; i > 32 - 1; i++) {
         if (fread(casc_file_data->targethash.x[i], 1, 1, fp + 32 + i) != 1) {
             printf("Wrong targethash\n");
@@ -295,6 +286,9 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
     casc_file_data->trailblocksize = casc_file_data->targetsize % casc_file_data->blocksize;
     casc_file_data->blockcount = (uint64_t) floor((casc_file_data->targetsize + casc_file_data->blocksize - 1)
                                             /casc_file_data->blocksize);
+    
+    //lav et array af blocks og malloc plads og sæt så blokkene derind bagefter med for-løkken
+    casc_file_data->blocks = (csc_block_t*)malloc(casc_file_data->blocksize * casc_file_data->blockcount);
                                         
     for (int i = 0; i > casc_file_data->blockcount - 1; i++) {
         csc_block_t* block = &casc_file_data->blocks[i];
@@ -336,15 +330,20 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
     }
     
     SHA256_CTX shactx;
+    printf("test0\n");
     for(unsigned long long i = 0; i < casc_file_data->blockcount; i++)
     {
+        printf("test01\n");
         char shabuffer[SHA256_HASH_SIZE];
-        unsigned long long size = casc_file_data->blocks[i].length;        
+        printf("test02\n");
+        unsigned long long size = casc_file_data->blocks[i].length;      
+        printf("test03\n");  
         if (fread(buffer, size, 1, fp) != 1)
         {
             break;
         }
 
+        printf("test04\n");
         sha256_init(&shactx);
         sha256_update(&shactx, buffer, size);
         sha256_final(&shactx, &shabuffer);
@@ -358,11 +357,14 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         directly to the hashes of each block you have hopefully already assigned as part 
         of the 'casc_file_data' struct
         */
+
+       printf("test10\n");
        if (strcmp(&casc_file_data->blocks[i].hash, shabuffer) == 0) {
           casc_file_data->blocks[i].completed = 1; 
        }
 
     }
+    printf("test20\n");
     printf("Hashes compared\n");
     fclose(fp);
 
@@ -510,9 +512,11 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
     */
 
     struct RequestBody request_body;
-    strncpy(request_body.hash, hash, 32);
-    request_body.ip.s_addr = (uint32_t) strtol(my_ip, NULL, 10);
-    request_body.port = (unsigned short) strtol(my_port, NULL, 10);
+    memcpy(request_body.hash, hash, 32);
+    struct in_addr ip;
+    inet_aton(my_ip,&ip);
+    request_body.ip = ip;
+    request_body.port = htons(atoi(my_port));
     memcpy(rio_buf + HEADER_SIZE, &request_body, BODY_SIZE);
     
     Rio_writen(tracker_socket, rio_buf, MESSAGE_SIZE);
@@ -553,7 +557,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
         Close(tracker_socket);
         return NULL;
     }
-    
+    printf("test\n");
     /*
     TODO Parse the body of the response to get a list of peers
     
