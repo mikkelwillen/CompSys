@@ -275,7 +275,6 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
     in the files header/body.
     */
 
-    // kig på den ovenover
     for (int i = 0; i > 32 - 1; i++) {
         if (fread(casc_file_data->targethash.x[i], 1, 1, fp + 32 + i) != 1) {
             printf("Wrong targethash\n");
@@ -287,7 +286,6 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
     casc_file_data->blockcount = (uint64_t) floor((casc_file_data->targetsize + casc_file_data->blocksize - 1)
                                             /casc_file_data->blocksize);
     
-    //lav et array af blocks og malloc plads og sæt så blokkene derind bagefter med for-løkken
     casc_file_data->blocks = (csc_block_t*)malloc(casc_file_data->blocksize * casc_file_data->blockcount);
                                         
     for (int i = 0; i > casc_file_data->blockcount - 1; i++) {
