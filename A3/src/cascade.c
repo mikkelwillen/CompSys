@@ -340,7 +340,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         {
             break;
         }
-
+        //Den kommer ikke her til
         printf("test04\n");
         sha256_init(&shactx);
         sha256_update(&shactx, buffer, size);
