@@ -147,7 +147,7 @@ void download_only_peer(char *cascade_file)
             printf("No peers were found. Will try again in %d seconds\n", PEER_REQUEST_DELAY);
             fflush(stdout);
             sleep(PEER_REQUEST_DELAY);
-        }
+        } 
         else
         {
             printf("Found %d peer(s)\n", peercount);
