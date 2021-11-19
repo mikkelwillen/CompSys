@@ -338,6 +338,8 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         printf("test03\n");  
         if (fread(buffer, size, 1, fp) != 1)
         {
+            printf("%a", fread(buffer, size, 1, fp));
+            printf("break\n");
             break;
         }
         //Den kommer ikke her til
