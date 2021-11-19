@@ -338,7 +338,8 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         printf("test03\n");  
         if (fread(buffer, size, 1, fp) != 1)
         {
-            printf("%a", fread(buffer, size, 1, fp));
+            printf("%d\n", size);
+            printf("%d\n", fread(buffer, size, 1, fp));
             printf("break\n");
             break;
         }
@@ -525,6 +526,10 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
     
     char reply_header[REPLY_HEADER_SIZE];
     memcpy(reply_header, rio_buf, REPLY_HEADER_SIZE);
+
+    char message[MESSAGE_SIZE];
+    memcpy(message, rio_buf + REPLY_HEADER_SIZE, MESSAGE_SIZE);
+
     printf("list of peers request completed\n");  
 
     uint32_t msglen = ntohl(*(uint32_t*)&reply_header[1]);
@@ -557,35 +562,38 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
         Close(tracker_socket);
         return NULL;
     }
-    printf("test\n");
+    printf("test %d\n", msglen);
     /*
     TODO Parse the body of the response to get a list of peers
     
     HINT Some of the later provided code expects the peers to be stored in the ''peers' variable, which 
     is an array of 'csc_peer's, as defined in cascade.h
     */
+    peers = (csc_peer_t*) malloc(sizeof(csc_peer_t) * (msglen / 12));
     int peercount = 0;
-    for (int i = 0; i > msglen / 12 - 1; i++) {
-        csc_peer_t peer;
-        if (fread(peer.ip, 4, 1, rio_buf + (i * 12)) != 1) {
+    for (int i = 0; i < msglen / 12; i++) {
+        printf("forloop %d\n", i);
+        csc_peer_t* peer = malloc(sizeof(csc_peer_t));
+        printf("malloc succesful\n");
+        if (fread(peer->ip, 4, 1, rio_buf + (i * 12)) != 1) {
             printf("Wrong ip\n");
             fclose(tracker_socket);
             return NULL;
         }
-
-        if (fread(peer.port, 2, 1, rio_buf + (i * 12 + 4)) != 1) {
+        printf("den er fjing\n");
+        if (fread(peer->port, 2, 1, rio_buf + (i * 12 + 4)) != 1) {
             printf("Wrong port\n");
             fclose(tracker_socket);
             return NULL;
         }
-
-        if (fread(peer.lastseen, 4, 1, rio_buf + (i * 12 + 6)) != 1) {
+        printf("den er fjong\n");
+        if (fread(peer->lastseen, 4, 1, rio_buf + (i * 12 + 6)) != 1) {
             printf("Wrong lastseen\n");
             fclose(tracker_socket);
             return NULL;
         }
 
-        if (fread(peer.good, 1, 1, rio_buf + (i * 12 + 10)) != 1) {
+        if (fread(peer->good, 1, 1, rio_buf + (i * 12 + 10)) != 1) {
             printf("Wrong flag\n");
             fclose(tracker_socket);
             return NULL;
@@ -593,7 +601,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
         peercount++;
         peers[i] = &peer;
     }
-    printf("List of peers completed\n");
+    printf("List of peers completed %d\n", peercount);
     Close(tracker_socket);
     return peercount;
 }
