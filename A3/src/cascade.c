@@ -123,7 +123,7 @@ void download_only_peer(char *cascade_file)
     }
     uncomp_count = (int) sizeof(missing_blocks)/sizeof(missing_blocks[0]);
     queue = &missing_blocks;
-    printf("Missing blocks\n");
+    printf("Created a list of missing blocks\n");
 
     /*
     TODO Compute the hash of the cascade file
@@ -306,7 +306,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
             }
         }
     }
-    printf("Cascade file parsed og gemt\n");
+    printf("Cascade file parsed and saved\n");
     
     fclose(fp);
 
@@ -328,23 +328,14 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
     }
     
     SHA256_CTX shactx;
-    printf("test0\n");
     for(unsigned long long i = 0; i < casc_file_data->blockcount; i++)
     {
-        printf("test01\n");
         char shabuffer[SHA256_HASH_SIZE];
-        printf("test02\n");
         unsigned long long size = casc_file_data->blocks[i].length;      
-        printf("test03\n");  
         if (fread(buffer, size, 1, fp) != 1)
         {
-            printf("%d\n", size);
-            printf("%d\n", fread(buffer, size, 1, fp));
-            printf("break\n");
             break;
         }
-        //Den kommer ikke her til
-        printf("test04\n");
         sha256_init(&shactx);
         sha256_update(&shactx, buffer, size);
         sha256_final(&shactx, &shabuffer);
@@ -358,15 +349,12 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination)
         directly to the hashes of each block you have hopefully already assigned as part 
         of the 'casc_file_data' struct
         */
-
-       printf("test10\n");
        if (strcmp(&casc_file_data->blocks[i].hash, shabuffer) == 0) {
           casc_file_data->blocks[i].completed = 1; 
        }
+       printf("Hashes compared\n");
 
     }
-    printf("test20\n");
-    printf("Hashes compared\n");
     fclose(fp);
 
     return casc_file_data;
@@ -492,7 +480,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
 
     tracker_socket = Open_clientfd(tracker_ip, tracker_port);
     Rio_readinitb(&rio, tracker_socket);
-    printf("connection to tracker\n");
+    printf("Connected to the tracker\n");
 
     struct RequestHeader request_header;
     strncpy(request_header.protocol, "CASC", 4);
@@ -530,7 +518,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
     char message[MESSAGE_SIZE];
     memcpy(message, rio_buf + REPLY_HEADER_SIZE, MESSAGE_SIZE);
 
-    printf("list of peers request completed\n");  
+    printf("List of peers request completed\n");  
 
     uint32_t msglen = ntohl(*(uint32_t*)&reply_header[1]);
     if (msglen == 0)
@@ -562,7 +550,7 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
         Close(tracker_socket);
         return NULL;
     }
-    printf("test %d\n", msglen);
+
     /*
     TODO Parse the body of the response to get a list of peers
     
@@ -572,21 +560,22 @@ int get_peers_list(csc_peer_t** peers, unsigned char* hash)
     peers = (csc_peer_t*) malloc(sizeof(csc_peer_t) * (msglen / 12));
     int peercount = 0;
     for (int i = 0; i < msglen / 12; i++) {
-        printf("forloop %d\n", i);
         csc_peer_t* peer = malloc(sizeof(csc_peer_t));
-        printf("malloc succesful\n");
+        printf("Allocated space for peer succesfully\n");
         if (memcpy(peer->ip, message + (i * 12), 4)) {
             printf("Wrong ip\n");
             Close(tracker_socket);
             return NULL;
         }
-        printf("den er fjing\n");
+        printf("Succesfully asssigned IP-adress\n");
+        
         if (memcpy(peer->port, message + (i * 12 + 4), 2) != 1) {
             printf("Wrong port\n");
             Close(tracker_socket);
             return NULL;
         }
-        printf("den er fjong\n");
+        printf("Succesfully asssigned port\n");
+        
         if (memcpy(peer->lastseen, message + (i * 12 + 6), 4)) {
             printf("Wrong lastseen\n");
             Close(tracker_socket);
