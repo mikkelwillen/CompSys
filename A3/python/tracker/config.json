@@ -1,5 +1,5 @@
 {
-    "port": 8888,
+    "port": 8880,
     "ban-private": false,
     "allowedhashes": [
         "713a203b7e89753a8893f7d452e8bcc19de65024595f50ddf7899f1da9d95fff",
