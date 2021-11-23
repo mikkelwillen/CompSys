@@ -458,13 +458,12 @@ int get_peers_list(hashdata_t hash)
     memcpy(reply_header, msg_buf, REPLY_HEADER_SIZE);
 
     uint32_t msglen = ntohl(*(uint32_t*)&reply_header[1]);
-    if (msglen == 0)
-    {
+    if (msglen == 0) {
+        Close(tracker_socket);
         return 0;
     }
 
-    if (reply_header[0] != 0)
-    {
+    if (reply_header[0] != 0) {
         char* error_buf = Malloc(msglen + 1);
         if (error_buf == NULL)
         {
