@@ -321,7 +321,7 @@ void get_block(csc_block_t* block, csc_peer_t peer, hashdata_t hash, char* outpu
         return;
     }
 
-    // msglen+1 to make room for terminating null byte.
+    // msglen + 1 to make room for terminating null byte.
     char *block_data = Calloc(msglen+1, sizeof(char));
     hashdata_t block_hash;
 
