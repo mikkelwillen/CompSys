@@ -19,9 +19,13 @@ char tracker_port[PORT_LEN];
 char my_ip[IP_LEN];
 char my_port[PORT_LEN];
 
-struct csc_file *casc_file;
+struct csc_file* casc_file;
 csc_block_t** queue;
-struct csc_peer *peers;
+struct csc_peer* peers;
+struct socket_info** connections;
+int number_of_connections = 0;
+
+int got_file = 0;
 
 /*
  * Frees global resources that are malloc'ed during peer downloads.
@@ -47,7 +51,7 @@ void get_data_sha(const char* sourcedata, hashdata_t hash, uint32_t data_size, i
 
     for (int i = 0; i < hash_size; i++) {
         hash[i] = shabuffer[i];
-        }
+    }
 }
 
 /*
@@ -74,6 +78,38 @@ void get_file_sha(const char* sourcefile, hashdata_t hash, int size) {
     Fclose(fp);
 
     get_data_sha(buffer, hash, casc_file_size, size);
+}
+
+
+// tjekker for forbindelser, og sætter dem i et array.
+// hvorfor kører den ikke???
+void* check_for_connections(void* vargp) {
+    int listen_socket = *((int*)vargp);
+    Free(vargp);
+    socklen_t clientlen = sizeof(struct sockaddr_storage);
+    struct sockaddr_storage clientaddr;
+    int* connfdp;
+    char client_hostname[MAXLINE], client_port[MAXLINE];
+
+    while(1) {
+        connfdp = Malloc(sizeof(int));
+        socket_info_t* new_connection = Malloc(sizeof(socket_info_t));
+        
+        *connfdp = Accept(listen_socket, (SA*) &clientaddr, &clientlen);
+        Getnameinfo((SA *) &clientaddr, clientlen, client_hostname, MAXLINE,
+                    client_port, MAXLINE, 0);
+        printf("Connected to (%s, %s)\n",
+           client_hostname, client_port);
+
+        new_connection->clientaddr = clientaddr;
+        new_connection->clientlen = clientlen;
+        new_connection->connfdp = *(int*)connfdp;
+        if (number_of_connections < MAX_CONNECTIONS) {
+            connections[number_of_connections] = new_connection;
+        }
+    }
+    Pthread_detach(pthread_self());
+    return NULL;
 }
 
 /*
@@ -111,41 +147,43 @@ void download_only_peer(char* cascade_file) {
     if (uncomp_count == 0) {
         printf("All blocks are already present, skipping external connections.\n");
         free_resources();
-        return;
-    }
-    queue = Realloc(queue, uncomp_count * sizeof(csc_block_t*));
+        // hvorfor stopper programmet her???
+    } else {
+        queue = Realloc(queue, uncomp_count * sizeof(csc_block_t*));
 
-    hashdata_t hash_buf;
-    get_file_sha(cascade_file, hash_buf, SHA256_HASH_SIZE);
+        hashdata_t hash_buf;
+        get_file_sha(cascade_file, hash_buf, SHA256_HASH_SIZE);
 
-    int peercount = 0;
-    while (peercount == 0) {
-        peercount = get_peers_list(hash_buf);
-        if (peercount == 0) {
-            printf("No peers were found. Will try again in %d seconds\n", PEER_REQUEST_DELAY);
-            fflush(stdout);
-            sleep(PEER_REQUEST_DELAY);
-        } else {
-            printf("Found %d peer(s)\n", peercount);
+        int peercount = 0;
+        while (peercount == 0) {
+            peercount = get_peers_list(hash_buf);
+            if (peercount == 0) {
+                printf("No peers were found. Will try again in %d seconds\n", PEER_REQUEST_DELAY);
+                fflush(stdout);
+                sleep(PEER_REQUEST_DELAY);
+            } else {
+                printf("Found %d peer(s)\n", peercount);
+            }
         }
-    }
 
-    csc_peer_t peer = peers[0];
-    // Get a good peer if one is available
-    for (int i = 0; i < peercount; i++) {
-        if (peers[i].good) {
-            peer = peers[i];
-            break;
+        csc_peer_t peer = peers[0];
+        // Get a good peer if one is available
+        for (int i = 0; i < peercount; i++) {
+            if (peers[i].good) {
+                peer = peers[i];
+                break;
+            }
         }
-    }
 
-    printf("Downloading blocks\n");
-    for (int i = 0; i < uncomp_count; i++) {
-        get_block(queue[i], peer, hash_buf, output_file);
-    }
-    printf("File downloaded successfully\n");
+        printf("Downloading blocks\n");
+        for (int i = 0; i < uncomp_count; i++) {
+            get_block(queue[i], peer, hash_buf, output_file);
+        }
+        printf("File downloaded successfully\n");
+        got_file = 1;
 
-    free_resources();
+        free_resources();
+    }
 }
 
 /*
@@ -494,6 +532,7 @@ int main(int argc, char **argv) {
     snprintf(tracker_port, PORT_LEN, "%s", argv[3]);
     snprintf(my_ip,   IP_LEN, "%s",   argv[4]);
     snprintf(my_port, PORT_LEN, "%s", argv[5]);
+    pthread_t tid;
 
     char cas_str[strlen(argv[1])];
     snprintf(cas_str, strlen(argv[1]) + 1, "%s", argv[1]);
@@ -520,5 +559,23 @@ int main(int argc, char **argv) {
         download_only_peer(cascade_files[j]);
     }
 
+    // her laver vi upload
+    if(got_file) {
+        printf("serving forever\n");
+    }
+
+    int listenfd = Open_listenfd(my_port);
+    connections = Malloc(sizeof(socket_info_t) * MAX_CONNECTIONS);
+    Pthread_create(&tid, NULL, check_for_connections, &listenfd);
+
+    // while(got_file) {
+    //     printf("got_file is good\n");
+    //     sleep(1);
+    // }
+
     exit(EXIT_SUCCESS);
 }
+
+// søg på:
+// hvorfor stopper programmet her???
+// hvorfor kører den ikke???

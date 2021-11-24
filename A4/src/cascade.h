@@ -14,6 +14,7 @@
 #define PEER_REQUEST_HEADER_SIZE    64
 #define PEER_RESPONSE_HEADER_SIZE   9
 #define MAX_LINE                    128
+#define MAX_CONNECTIONS             12
 
 typedef uint8_t hashdata_t[SHA256_HASH_SIZE];
 
@@ -76,6 +77,12 @@ typedef struct csc_peer {
     uint32_t lastseen;
     uint8_t good;
 } csc_peer_t;
+
+typedef struct socket_info {
+    int connfdp;
+    socklen_t clientlen;
+    struct sockaddr_storage clientaddr;
+} socket_info_t;
 
 /*
  * Parses a hex-string and returns the bytes corresponding to the value
