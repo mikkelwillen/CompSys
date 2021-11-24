@@ -36,6 +36,7 @@ void free_resources() {
     csc_free_file(casc_file);
 }
 
+
 /*
  * Gets a sha256 hash of specified data, sourcedata. The hash itself is
  * placed into the given variable 'hash'. Any size can be created, but a
@@ -53,6 +54,7 @@ void get_data_sha(const char* sourcedata, hashdata_t hash, uint32_t data_size, i
         hash[i] = shabuffer[i];
     }
 }
+
 
 /*
  * Gets a sha256 hash of a specified file, sourcefile. The hash itself is
@@ -84,8 +86,8 @@ void get_file_sha(const char* sourcefile, hashdata_t hash, int size) {
 // tjekker for forbindelser, og sætter dem i et array.
 // hvorfor kører den ikke???
 void* check_for_connections(void* vargp) {
+    printf("inde i check\n");
     int listen_socket = *((int*)vargp);
-    Free(vargp);
     socklen_t clientlen = sizeof(struct sockaddr_storage);
     struct sockaddr_storage clientaddr;
     int* connfdp;
@@ -179,6 +181,7 @@ void download_only_peer(char* cascade_file) {
         for (int i = 0; i < uncomp_count; i++) {
             get_block(queue[i], peer, hash_buf, output_file);
         }
+
         printf("File downloaded successfully\n");
         got_file = 1;
 
@@ -196,6 +199,7 @@ int count_occurences(char string[], char c) {
             count++;
         }
     }
+
     return count;
 }
 
@@ -401,6 +405,7 @@ void get_block(csc_block_t* block, csc_peer_t peer, hashdata_t hash, char* outpu
         Close(peer_socket);
         return;
     }
+
     fseek(fp, block->offset, SEEK_SET);
     Fputs(block_data, fp);
 
@@ -458,6 +463,7 @@ int get_peers_list(hashdata_t hash) {
             Close(tracker_socket);
             return 0;
         }
+
         memset(error_buf, 0, msglen + 1);
         memcpy(reply_header, error_buf, msglen);
         printf("Tracker gave error: %d - %s\n", reply_header[0], error_buf);
@@ -503,8 +509,10 @@ int get_peers_list(hashdata_t hash) {
 
         printf("Got peer with IP: %s, and Port: %s\n", ip, port_buf);
     }
+    
     Close(tracker_socket);
     return peercount;
+    // forsvinder vi fra listen af peers, når vi lukker socket her???
 }
 
 /*
@@ -568,14 +576,21 @@ int main(int argc, char **argv) {
     connections = Malloc(sizeof(socket_info_t) * MAX_CONNECTIONS);
     Pthread_create(&tid, NULL, check_for_connections, &listenfd);
 
-    // while(got_file) {
-    //     printf("got_file is good\n");
-    //     sleep(1);
-    // }
+    while(got_file) {
+        printf("got_file is good\n");
+        sleep(1);
+    }
 
+    free(listenfd);
     exit(EXIT_SUCCESS);
 }
 
 // søg på:
 // hvorfor stopper programmet her???
 // hvorfor kører den ikke???
+// forsvinder vi fra listen af peers, når vi lukker socket her???
+
+
+// der er umiddelbart en del ting, som kan/burde slås sammen,
+// det virker dog, som om det er rigtigt meget omskrivning,
+// og er derfor en smule uoverskueligt.
