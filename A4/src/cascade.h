@@ -18,31 +18,27 @@
 
 typedef uint8_t hashdata_t[SHA256_HASH_SIZE];
 
-struct RequestHeader
-{
+struct RequestHeader {
     char protocol[4];
     unsigned int version;
     unsigned int command;
     unsigned int length;
 };
 
-struct RequestBody
-{
+struct RequestBody {
     hashdata_t hash;
     struct in_addr ip;
     unsigned short port;
 };
 
-struct ClientRequest
-{
+struct ClientRequest {
     char protocol[8];
     char reserved[16];
     uint64_t block_num;
     hashdata_t hash;
 };
 
-struct ClientResponseHeader
-{
+struct ClientResponseHeader {
     char error[1];
     uint64_t length;
 };
