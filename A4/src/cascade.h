@@ -65,6 +65,9 @@ typedef struct csc_file {
     uint64_t trailblocksize;
     uint64_t blockcount;
     csc_block_t* blocks;
+    // nye
+    int uncomp_count;
+    char* output_file;
 } csc_file_t;
 
 typedef struct csc_peer {

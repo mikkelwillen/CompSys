@@ -20,6 +20,7 @@ char my_ip[IP_LEN];
 char my_port[PORT_LEN];
 
 struct csc_file* casc_file;
+char* output_file;
 csc_block_t** queue;
 struct csc_peer* peers;
 struct socket_info** connections;
@@ -115,6 +116,33 @@ void* check_for_connections(void* vargp) {
     return NULL;
 }
 
+void check_txt_file(char* cascade_file) {
+    if (access(cascade_file, F_OK ) != 0 ) {
+        fprintf(stderr, ">> File %s does not exist\n", cascade_file);
+        exit(EXIT_FAILURE);
+    }
+
+    output_file = Malloc(strlen(cascade_file));
+    memcpy(output_file, cascade_file, strlen(cascade_file));
+    char* r = strstr(cascade_file, "cascade");
+    int cutoff = r - cascade_file;
+    output_file[cutoff - 1] = '\0';
+    printf("Downloading to: %s\n", output_file);
+
+    casc_file = csc_parse_file(cascade_file, output_file);
+
+    int uncomp_count = 0;
+    queue = Malloc(casc_file->blockcount * sizeof(csc_block_t*));
+
+    for (uint64_t i = 0; i < casc_file->blockcount; i++) {
+        if (casc_file->blocks[i].completed == 0) {
+            queue[uncomp_count] = &casc_file->blocks[i];
+            uncomp_count++;
+        }
+    }
+}
+
+
 /*
  * Perform all client based interactions in the P2P network for a given cascade file.
  * E.g. parse a cascade file and get all the relevent data from somewhere else on the
@@ -134,7 +162,6 @@ void download_only_peer(char* cascade_file) {
     output_file[cutoff - 1] = '\0';
     printf("Downloading to: %s\n", output_file);
 
-    // hvordan kender vi indexet i listen???
     casc_file = csc_parse_file(cascade_file, output_file);
 
     int uncomp_count = 0;
