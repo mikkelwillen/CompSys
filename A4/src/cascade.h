@@ -58,6 +58,13 @@ typedef struct csc_block {
     hashdata_t hash;
 } csc_block_t;
 
+typedef struct csc_peer {
+    char ip[16];
+    char port[8];
+    uint32_t lastseen;
+    uint8_t good;
+} csc_peer_t;
+
 typedef struct csc_file {
     uint64_t targetsize;
     uint64_t blocksize;
@@ -70,17 +77,11 @@ typedef struct csc_file {
     int got_all_blocks;
     int index;
     char* name;
-    csc_peer_t* peers;
+    struct csc_peer* peers;
     hashdata_t* hash;
     int peercount;
 } csc_file_t;
 
-typedef struct csc_peer {
-    char ip[16];
-    char port[8];
-    uint32_t lastseen;
-    uint8_t good;
-} csc_peer_t;
 
 typedef struct socket_info {
     int connfdp;

@@ -22,17 +22,18 @@ char my_port[PORT_LEN];
 struct csc_file** casc_files;
 char** output_files;
 csc_block_t*** queue;
-struct csc_peer* peers;
 struct socket_info** connections;
 int number_of_connections = 0;
 
 /*
  * Frees global resources that are malloc'ed during peer downloads.
  */
+
+// der skal free's alle peers og alle casc_files
 void free_resources() {
     free(queue);
-    free(peers);
-    csc_free_file(casc_files);
+    free(casc_files[0]->peers);
+    csc_free_file(*casc_files);
 }
 
 
@@ -109,6 +110,8 @@ void* check_for_connections(void* vargp) {
         if (number_of_connections < MAX_CONNECTIONS) {
             connections[number_of_connections] = new_connection;
         }
+
+        // laver en thread, som laver upload
     }
 
     Pthread_detach(pthread_self());
@@ -149,7 +152,7 @@ void check_txt_file(char* cascade_file, int i) {
 
     hashdata_t hash_buf;
     get_file_sha(casc_files[i]->name, hash_buf, SHA256_HASH_SIZE);
-    casc_files[i]->hash = hash_buf;
+    casc_files[i]->hash = &hash_buf;
 }
 
 
@@ -163,24 +166,33 @@ void download_only_peer(csc_file_t* cascade_file) {
 
     queue = Realloc(queue, cascade_file->uncomp_count * sizeof(csc_block_t*));
 
-    csc_peer_t peer = peers[0];
+    csc_peer_t peer = cascade_file->peers[0];
     // Get a good peer if one is available
-    for (int i = 0; i < peercount; i++) {
-        if (peers[i].good) {
-            peer = peers[i];
+    for (int i = 0; i < cascade_file->peercount; i++) {
+        if (cascade_file->peers[i].good) {
+            peer = cascade_file->peers[i];
             break;
         }
     }
 
     printf("Downloading blocks\n");
     for (int i = 0; i < cascade_file->uncomp_count; i++) {
-        get_block(queue[cascade_file->index][i], peer, hash_buf, output_files[cascade_file->index]);
+        get_block(queue[cascade_file->index][i], peer, *cascade_file->hash, output_files[cascade_file->index]);
     }
 
     printf("File downloaded successfully\n");
     cascade_file->got_all_blocks = 1;
 
     free_resources();
+
+    Pthread_detach(pthread_self());
+}
+
+void upload() {
+    // vi skal finde ud af, hvilke argumenter denne funktion skal bruge
+    // siden det er en thread, skal den kun tage et argument
+    // vi skal finde ud af, hvordan vi sender blocks via protocollen
+    //     
 }
 
 /*
@@ -448,7 +460,6 @@ void subscribe(csc_file_t* casc_file, int command) {
         uint32_t msglen = ntohl(*(uint32_t*)&reply_header[1]);
         if (msglen == 0) {
             Close(tracker_socket);
-            return 0;
         }
 
         if (reply_header[0] != 0) {
@@ -478,7 +489,7 @@ void subscribe(csc_file_t* casc_file, int command) {
 
         int peercount = 0;
         peercount = (uint32_t)(msglen / 12);
-        peers = Malloc(sizeof(csc_peer_t) * peercount);
+        casc_file->peers = Malloc(sizeof(csc_peer_t) * peercount);
         casc_file->peercount = peercount;
 
         for(int i = 0; i < peercount; i++) {
@@ -565,19 +576,24 @@ int main(int argc, char **argv) {
 
     // For hver csc_file subscriber vi 
     for (int j = 0; j < casc_count; j++) {
-        if (casc_files[j]->got_all_blocks = 0) {
+        if (casc_files[j]->got_all_blocks == 0) {
             subscribe(casc_files[j], 1); // 1 = get peers list
         } else {
             subscribe(casc_files[j], 2); // 2 = subscribe
         }   
     }
-
     
-
+    // checker for nye forbindelser
     int listenfd = Open_listenfd(my_port);
     connections = Malloc(sizeof(socket_info_t) * MAX_CONNECTIONS);
     Pthread_create(&tid, NULL, check_for_connections, &listenfd);
 
+    // checker om der mangler blocks, og kører download, hvis der gør
+    for (int j = 0; j < casc_count; j++) {
+        if (casc_files[j]->got_all_blocks != 0) {
+            Pthread_create(&tid, NULL, download_only_peer, &casc_files[j]);
+        }
+    }
 
     exit(EXIT_SUCCESS);
 }
