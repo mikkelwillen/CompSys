@@ -67,7 +67,12 @@ typedef struct csc_file {
     csc_block_t* blocks;
     // nye
     int uncomp_count;
-    char* output_file;
+    int got_all_blocks;
+    int index;
+    char* name;
+    csc_peer_t* peers;
+    hashdata_t* hash;
+    int peercount;
 } csc_file_t;
 
 typedef struct csc_peer {
@@ -115,7 +120,7 @@ int csc_get_peers(csc_ipport_t tracker, hashdata_t cascadehash, csc_ipport_t loc
  */
 int csc_download_block(csc_ipport_t client, hashdata_t cascadehash, uint64_t blockno, uint64_t blocklength, void* buffer);
 
-int get_peers_list(hashdata_t hash);
+int subscribe(hashdata_t hash, int command);
 void get_block(csc_block_t* block, csc_peer_t peer, hashdata_t hash, char* output_file);
 
 #endif

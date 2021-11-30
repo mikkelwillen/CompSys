@@ -19,14 +19,12 @@ char tracker_port[PORT_LEN];
 char my_ip[IP_LEN];
 char my_port[PORT_LEN];
 
-struct csc_file* casc_file;
-char* output_file;
-csc_block_t** queue;
+struct csc_file** casc_files;
+char** output_files;
+csc_block_t*** queue;
 struct csc_peer* peers;
 struct socket_info** connections;
 int number_of_connections = 0;
-
-int got_file = 0;
 
 /*
  * Frees global resources that are malloc'ed during peer downloads.
@@ -34,7 +32,7 @@ int got_file = 0;
 void free_resources() {
     free(queue);
     free(peers);
-    csc_free_file(casc_file);
+    csc_free_file(casc_files);
 }
 
 
@@ -85,6 +83,7 @@ void get_file_sha(const char* sourcefile, hashdata_t hash, int size) {
 
 
 // tjekker for forbindelser, og sætter dem i et array.
+// worker thread
 void* check_for_connections(void* vargp) {
     printf("inde i check\n");
     int listen_socket = *((int*)vargp);
@@ -116,30 +115,41 @@ void* check_for_connections(void* vargp) {
     return NULL;
 }
 
-void check_txt_file(char* cascade_file) {
+void check_txt_file(char* cascade_file, int i) {
     if (access(cascade_file, F_OK ) != 0 ) {
         fprintf(stderr, ">> File %s does not exist\n", cascade_file);
         exit(EXIT_FAILURE);
     }
 
-    output_file = Malloc(strlen(cascade_file));
-    memcpy(output_file, cascade_file, strlen(cascade_file));
+    output_files[i] = Malloc(strlen(cascade_file));
+    memcpy(output_files[i], cascade_file, strlen(cascade_file));
     char* r = strstr(cascade_file, "cascade");
     int cutoff = r - cascade_file;
-    output_file[cutoff - 1] = '\0';
-    printf("Downloading to: %s\n", output_file);
+    output_files[i][cutoff - 1] = '\0';
 
-    casc_file = csc_parse_file(cascade_file, output_file);
+    casc_files[i] = csc_parse_file(cascade_file, output_files[i]);
 
-    int uncomp_count = 0;
-    queue = Malloc(casc_file->blockcount * sizeof(csc_block_t*));
+    casc_files[i]->uncomp_count = 0;
+    casc_files[i]->index = i;
+    casc_files[i]->name = cascade_file;
 
-    for (uint64_t i = 0; i < casc_file->blockcount; i++) {
-        if (casc_file->blocks[i].completed == 0) {
-            queue[uncomp_count] = &casc_file->blocks[i];
-            uncomp_count++;
+    queue[i] = Malloc(casc_files[i]->blockcount * sizeof(csc_block_t*));
+
+    for (uint64_t j = 0; j < casc_files[i]->blockcount; j++) {
+        if (casc_files[i]->blocks[j].completed == 0) {
+            queue[i][casc_files[i]->uncomp_count] = &casc_files[i]->blocks[j];
         }
     }
+    
+    if (casc_files[i]->uncomp_count == 0) {
+        printf("All blocks are already present, skipping external connections.\n");
+        free_resources();
+        casc_files[i]->got_all_blocks = 1;
+    }
+
+    hashdata_t hash_buf;
+    get_file_sha(casc_files[i]->name, hash_buf, SHA256_HASH_SIZE);
+    casc_files[i]->hash = hash_buf;
 }
 
 
@@ -148,75 +158,29 @@ void check_txt_file(char* cascade_file) {
  * E.g. parse a cascade file and get all the relevent data from somewhere else on the
  * network.
  */
-void download_only_peer(char* cascade_file) {
-    printf("Managing download only for: %s\n", cascade_file);
-    if (access(cascade_file, F_OK ) != 0 ) {
-        fprintf(stderr, ">> File %s does not exist\n", cascade_file);
-        exit(EXIT_FAILURE);
-    }
+void download_only_peer(csc_file_t* cascade_file) {
+    printf("Managing download only for: %s\n", cascade_file->name);
 
-    char output_file[strlen(cascade_file)];
-    memcpy(output_file, cascade_file, strlen(cascade_file));
-    char* r = strstr(cascade_file, "cascade");
-    int cutoff = r - cascade_file;
-    output_file[cutoff - 1] = '\0';
-    printf("Downloading to: %s\n", output_file);
+    queue = Realloc(queue, cascade_file->uncomp_count * sizeof(csc_block_t*));
 
-    casc_file = csc_parse_file(cascade_file, output_file);
-
-    int uncomp_count = 0;
-    queue = Malloc(casc_file->blockcount * sizeof(csc_block_t*));
-
-    for (uint64_t i = 0; i < casc_file->blockcount; i++) {
-        if (casc_file->blocks[i].completed == 0) {
-            queue[uncomp_count] = &casc_file->blocks[i];
-            uncomp_count++;
+    csc_peer_t peer = peers[0];
+    // Get a good peer if one is available
+    for (int i = 0; i < peercount; i++) {
+        if (peers[i].good) {
+            peer = peers[i];
+            break;
         }
     }
 
-    printf("Missing blocks: %d/%lud\n", uncomp_count, casc_file->blockcount);
-    if (uncomp_count == 0) {
-        printf("All blocks are already present, skipping external connections.\n");
-        free_resources();
-        got_file = 1;
-        // hvorfor stopper programmet her???
-    } else {
-        queue = Realloc(queue, uncomp_count * sizeof(csc_block_t*));
-
-        hashdata_t hash_buf;
-        get_file_sha(cascade_file, hash_buf, SHA256_HASH_SIZE);
-
-        int peercount = 0;
-        while (peercount == 0) {
-            peercount = get_peers_list(hash_buf);
-            if (peercount == 0) {
-                printf("No peers were found. Will try again in %d seconds\n", PEER_REQUEST_DELAY);
-                fflush(stdout);
-                sleep(PEER_REQUEST_DELAY);
-            } else {
-                printf("Found %d peer(s)\n", peercount);
-            }
-        }
-
-        csc_peer_t peer = peers[0];
-        // Get a good peer if one is available
-        for (int i = 0; i < peercount; i++) {
-            if (peers[i].good) {
-                peer = peers[i];
-                break;
-            }
-        }
-
-        printf("Downloading blocks\n");
-        for (int i = 0; i < uncomp_count; i++) {
-            get_block(queue[i], peer, hash_buf, output_file);
-        }
-
-        printf("File downloaded successfully\n");
-        got_file = 1;
-
-        free_resources();
+    printf("Downloading blocks\n");
+    for (int i = 0; i < cascade_file->uncomp_count; i++) {
+        get_block(queue[cascade_file->index][i], peer, hash_buf, output_files[cascade_file->index]);
     }
+
+    printf("File downloaded successfully\n");
+    cascade_file->got_all_blocks = 1;
+
+    free_resources();
 }
 
 /*
@@ -448,7 +412,7 @@ void get_block(csc_block_t* block, csc_peer_t peer, hashdata_t hash, char* outpu
  * Get a list of peers on the network from a tracker. Note that this query is doing double duty according to
  * the protocol, and by asking for a list of peers we are also enrolling on the network ourselves.
  */
-int get_peers_list(hashdata_t hash) {
+void subscribe(csc_file_t* casc_file, int command) {
     rio_t rio;
     char msg_buf[MAXLINE];
 
@@ -460,7 +424,7 @@ int get_peers_list(hashdata_t hash) {
     memcpy(request_header.protocol, "CASC", sizeof(request_header.protocol));
 
     request_header.version = htonl(1);
-    request_header.command = htonl(1);
+    request_header.command = htonl(command);
     request_header.length = htonl(BODY_SIZE);
     memcpy(msg_buf, &request_header, HEADER_SIZE);
 
@@ -468,141 +432,82 @@ int get_peers_list(hashdata_t hash) {
     inet_aton(my_ip, &byte_my_ip);
 
     struct RequestBody request_body;
-    memcpy(request_body.hash, hash, SHA256_HASH_SIZE);
+    memcpy(request_body.hash, casc_file->hash, SHA256_HASH_SIZE);
     request_body.ip = byte_my_ip;
     request_body.port = htons(atoi(my_port));
     memcpy(msg_buf + HEADER_SIZE, &request_body, BODY_SIZE);
 
     Rio_writen(tracker_socket, msg_buf, MESSAGE_SIZE);
 
-    Rio_readnb(&rio, msg_buf, MAXLINE);
+    if (command == 1) {
+        Rio_readnb(&rio, msg_buf, MAXLINE);
 
-    char reply_header[REPLY_HEADER_SIZE];
-    memcpy(reply_header, msg_buf, REPLY_HEADER_SIZE);
+        char reply_header[REPLY_HEADER_SIZE];
+        memcpy(reply_header, msg_buf, REPLY_HEADER_SIZE);
 
-    uint32_t msglen = ntohl(*(uint32_t*)&reply_header[1]);
-    if (msglen == 0) {
-        Close(tracker_socket);
-        return 0;
-    }
-
-    if (reply_header[0] != 0) {
-        char* error_buf = Malloc(msglen + 1);
-        if (error_buf == NULL) {
-            printf("Tracker error %d and out-of-memory reading error\n", reply_header[0]);
+        uint32_t msglen = ntohl(*(uint32_t*)&reply_header[1]);
+        if (msglen == 0) {
             Close(tracker_socket);
             return 0;
         }
 
-        memset(error_buf, 0, msglen + 1);
-        memcpy(reply_header, error_buf, msglen);
-        printf("Tracker gave error: %d - %s\n", reply_header[0], error_buf);
-        Free(error_buf);
-        Close(tracker_socket);
-        return 0;
-    }
+        if (reply_header[0] != 0) {
+            char* error_buf = Malloc(msglen + 1);
+            if (error_buf == NULL) {
+                printf("Tracker error %d and out-of-memory reading error\n", reply_header[0]);
+                Close(tracker_socket);
+                return 0;
+            }
 
-    if (msglen % 12 != 0) {
-        printf("LIST response from tracker was length %ud but should be evenly divisible by 12\n", msglen);
-        Close(tracker_socket);
-        return 0;
-    }
+            memset(error_buf, 0, msglen + 1);
+            memcpy(reply_header, error_buf, msglen);
+            printf("Tracker gave error: %d - %s\n", reply_header[0], error_buf);
+            Free(error_buf);
+            Close(tracker_socket);
+            return 0;
+        }
 
-    unsigned char body[msglen];
-    memcpy(body, msg_buf+REPLY_HEADER_SIZE, msglen);
+        if (msglen % 12 != 0) {
+            printf("LIST response from tracker was length %ud but should be evenly divisible by 12\n", msglen);
+            Close(tracker_socket);
+            return 0;
+        }
 
-    int peercount = 0;
-    peercount = (uint32_t)(msglen / 12);
-    peers = Malloc(sizeof(csc_peer_t) * peercount);
+        unsigned char body[msglen];
+        memcpy(body, msg_buf+REPLY_HEADER_SIZE, msglen);
 
-    for(int i = 0; i < peercount; i++) {
-        uint8_t peerdata[12];
-        memcpy(peerdata, body+(12*i), 12);        
-               
-        uint32_t ip_buf;        
-        memcpy(&ip_buf, peerdata, 4);
+        int peercount = 0;
+        peercount = (uint32_t)(msglen / 12);
+        peers = Malloc(sizeof(csc_peer_t) * peercount);
+        casc_file->peercount = peercount;
 
-        char ip[IP_LEN];
-        struct in_addr ip_addr;
-        ip_addr.s_addr = ip_buf;
-        memcpy(ip, inet_ntoa(ip_addr), IP_LEN);    
+        for(int i = 0; i < peercount; i++) {
+            uint8_t peerdata[12];
+            memcpy(peerdata, body+(12*i), 12);        
                 
-        char port_buf[PORT_LEN]; 
-        sprintf(port_buf, "%1d", ntohs(*((uint16_t*)&peerdata[4])));       
-       
-        uint32_t lastseen = *((uint32_t*)&peerdata[6]);
+            uint32_t ip_buf;        
+            memcpy(&ip_buf, peerdata, 4);
 
-        memcpy(&peers[i].ip, ip, IP_LEN);
-        memcpy(&peers[i].port, port_buf, PORT_LEN);
-        peers[i].lastseen = ntohl(lastseen);
-        peers[i].good = peerdata[10];
+            char ip[IP_LEN];
+            struct in_addr ip_addr;
+            ip_addr.s_addr = ip_buf;
+            memcpy(ip, inet_ntoa(ip_addr), IP_LEN);    
+                    
+            char port_buf[PORT_LEN]; 
+            sprintf(port_buf, "%1d", ntohs(*((uint16_t*)&peerdata[4])));       
+        
+            uint32_t lastseen = *((uint32_t*)&peerdata[6]);
 
-        printf("Got peer with IP: %s, and Port: %s\n", ip, port_buf);
+            memcpy(&casc_file->peers[i].ip, ip, IP_LEN);
+            memcpy(&casc_file->peers[i].port, port_buf, PORT_LEN);
+            casc_file->peers[i].lastseen = ntohl(lastseen);
+            casc_file->peers[i].good = peerdata[10];
+
+            printf("Got peer with IP: %s, and Port: %s\n", ip, port_buf);
+        }
     }
     
-    Close(tracker_socket);
-    return peercount;
-}
-
-void subscribe_tracker() {
-    rio_t rio;
-    char msg_buf[MAXLINE];
-
-    int tracker_socket = Open_clientfd(tracker_ip, tracker_port);
-    Rio_readinitb(&rio, tracker_socket);
-
-    struct RequestHeader request_header;
-    // memcpy as it does not end with terminating null byte.
-    memcpy(request_header.protocol, "CASC", sizeof(request_header.protocol));
-
-    request_header.version = htonl(1);
-    request_header.command = htonl(1);
-    request_header.length = htonl(BODY_SIZE);
-    memcpy(msg_buf, &request_header, HEADER_SIZE);
-
-    struct in_addr byte_my_ip;
-    inet_aton(my_ip, &byte_my_ip);
-
-    struct RequestBody request_body;
-    memcpy(request_body.hash, hash, SHA256_HASH_SIZE);
-    request_body.ip = byte_my_ip;
-    request_body.port = htons(atoi(my_port));
-    memcpy(msg_buf + HEADER_SIZE, &request_body, BODY_SIZE);
-
-    Rio_writen(tracker_socket, msg_buf, MESSAGE_SIZE);
-
-    Rio_readnb(&rio, msg_buf, MAXLINE);
-
-    char reply_header[REPLY_HEADER_SIZE];
-    memcpy(reply_header, msg_buf, REPLY_HEADER_SIZE);
-
-    uint32_t msglen = ntohl(*(uint32_t*)&reply_header[1]);
-    if (msglen == 0) {
-        Close(tracker_socket);
-        return 0;
-    }
-
-    if (reply_header[0] != 0) {
-        char* error_buf = Malloc(msglen + 1);
-        if (error_buf == NULL) {
-            printf("Tracker error %d and out-of-memory reading error\n", reply_header[0]);
-            Close(tracker_socket);
-            return 0;
-        }
-
-        memset(error_buf, 0, msglen + 1);
-        memcpy(reply_header, error_buf, msglen);
-        printf("Tracker gave error: %d - %s\n", reply_header[0], error_buf);
-        Free(error_buf);
-        Close(tracker_socket);
-        return 0;
-    }
-
-    if (msglen % 12 != 0) {
-        printf("LIST response from tracker was length %ud but should be evenly divisible by 12\n", msglen);
-        Close(tracker_socket);
-        return 0;
-    }
+    Close(tracker_socket); //Skal vi lukke connection???
 }
 
 /*
@@ -653,36 +558,29 @@ int main(int argc, char **argv) {
         }
     }
 
+    // Laver en csc_file og sætter den en i det globale csc_files array
     for (int j = 0; j < casc_count; j++) {
-        download_only_peer(cascade_files[j]);
+        check_txt_file(cascade_files[j], j); // Thread?
     }
 
-    // her laver vi upload
-    if(got_file) {
-        printf("serving forever\n");
+    // For hver csc_file subscriber vi 
+    for (int j = 0; j < casc_count; j++) {
+        if (casc_files[j]->got_all_blocks = 0) {
+            subscribe(casc_files[j], 1); // 1 = get peers list
+        } else {
+            subscribe(casc_files[j], 2); // 2 = subscribe
+        }   
     }
+
+    
 
     int listenfd = Open_listenfd(my_port);
     connections = Malloc(sizeof(socket_info_t) * MAX_CONNECTIONS);
     Pthread_create(&tid, NULL, check_for_connections, &listenfd);
 
-    while(got_file) {
-        printf("got_file is good\n");
-        sleep(1);
-    }
 
     exit(EXIT_SUCCESS);
 }
 
 // søg på:
-// hvorfor stopper programmet her???
-// hvordan kender vi indexet i listen???
-
-// giver det mening af have en thread for forbindelser
-
-// skal vi kunne have flere porte åbne, hvis ja, skal det så 
-// omskrives, så vi kan forbinde med en anden port i download
-
-// der er umiddelbart en del ting, som kan/burde slås sammen,
-// det virker dog, som om det er rigtigt meget omskrivning,
-// og er derfor en smule uoverskueligt.
+// Skal vi lukke connection???
