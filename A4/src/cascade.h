@@ -120,7 +120,7 @@ int csc_get_peers(csc_ipport_t tracker, hashdata_t cascadehash, csc_ipport_t loc
  */
 int csc_download_block(csc_ipport_t client, hashdata_t cascadehash, uint64_t blockno, uint64_t blocklength, void* buffer);
 
-int subscribe(hashdata_t hash, int command);
+void subscribe(csc_file_t* casc_file, int command);
 void get_block(csc_block_t* block, csc_peer_t peer, hashdata_t hash, char* output_file);
 
 #endif
