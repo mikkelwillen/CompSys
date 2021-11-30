@@ -31,9 +31,9 @@ int number_of_connections = 0;
 
 // der skal free's alle peers og alle casc_files
 void free_resources() {
-    free(queue);
-    free(casc_files[0]->peers);
-    csc_free_file(*casc_files);
+    // free(queue);
+    // free(casc_files[0]->peers);
+    // csc_free_file(*casc_files);
 }
 
 
@@ -123,36 +123,46 @@ void check_txt_file(char* cascade_file, int i) {
         fprintf(stderr, ">> File %s does not exist\n", cascade_file);
         exit(EXIT_FAILURE);
     }
-
-    output_files[i] = Malloc(strlen(cascade_file));
-    memcpy(output_files[i], cascade_file, strlen(cascade_file));
+    printf("første tjek i check_txt_file\n");
+    printf("output_files[i] = Malloc(strlen(cascade_file));\n");
+    output_files = Malloc(strlen(cascade_file));
+    printf("memcpy(output_files[i], cascade_file, strlen(cascade_file));\n");
+    memcpy(output_files, cascade_file, strlen(cascade_file));
+    printf("char* r = strstr(cascade_file, cascade);\n");
     char* r = strstr(cascade_file, "cascade");
+    printf("int cutoff = r - cascade_file;\n");
     int cutoff = r - cascade_file;
-    output_files[i][cutoff - 1] = '\0';
+    printf("output_files[i][cutoff - 1] = '\0';\n");
+    output_files[cutoff - 1] = '\0';
 
-    casc_files[i] = csc_parse_file(cascade_file, output_files[i]);
+    printf("efter memcpy\n");
+    // tjek om output_files altid har været **
+    casc_files[i] = csc_parse_file(cascade_file, output_files);
 
     casc_files[i]->uncomp_count = 0;
     casc_files[i]->index = i;
     casc_files[i]->name = cascade_file;
 
+    printf("casc_files værdier initialiseret\n");
     queue[i] = Malloc(casc_files[i]->blockcount * sizeof(csc_block_t*));
 
+    printf("queue lavet\n");
     for (uint64_t j = 0; j < casc_files[i]->blockcount; j++) {
         if (casc_files[i]->blocks[j].completed == 0) {
             queue[i][casc_files[i]->uncomp_count] = &casc_files[i]->blocks[j];
         }
     }
-    
+    printf("ting puttet i køen\n");
     if (casc_files[i]->uncomp_count == 0) {
         printf("All blocks are already present, skipping external connections.\n");
         free_resources();
         casc_files[i]->got_all_blocks = 1;
     }
-
+    printf("tjek om alle blocks er der\n");
     hashdata_t hash_buf;
     get_file_sha(casc_files[i]->name, hash_buf, SHA256_HASH_SIZE);
     casc_files[i]->hash = &hash_buf;
+    printf("hash lavet\n");
 }
 
 
@@ -192,7 +202,7 @@ void upload() {
     // vi skal finde ud af, hvilke argumenter denne funktion skal bruge
     // siden det er en thread, skal den kun tage et argument
     // vi skal finde ud af, hvordan vi sender blocks via protocollen
-    //     
+    // 
 }
 
 /*
@@ -554,6 +564,7 @@ int main(int argc, char **argv) {
 
     int casc_count = count_occurences(argv[1], ':') + 1;
     char* cascade_files[casc_count];
+    printf("cascade array made\n");
 
     char* ptr = strtok(cas_str, delim);
     int i = 0;
@@ -569,11 +580,12 @@ int main(int argc, char **argv) {
         }
     }
 
+    printf("Cascade files inserted\n");
     // Laver en csc_file og sætter den en i det globale csc_files array
     for (int j = 0; j < casc_count; j++) {
         check_txt_file(cascade_files[j], j); // Thread?
     }
-
+    printf("check_txt_file run\n");
     // For hver csc_file subscriber vi 
     for (int j = 0; j < casc_count; j++) {
         if (casc_files[j]->got_all_blocks == 0) {
@@ -582,7 +594,7 @@ int main(int argc, char **argv) {
             subscribe(casc_files[j], 2); // 2 = subscribe
         }   
     }
-    
+    printf("subscribe run\n");
     // checker for nye forbindelser
     int listenfd = Open_listenfd(my_port);
     connections = Malloc(sizeof(socket_info_t) * MAX_CONNECTIONS);
