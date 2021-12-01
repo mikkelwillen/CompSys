@@ -83,42 +83,6 @@ void get_file_sha(const char* sourcefile, hashdata_t hash, int size) {
     get_data_sha(buffer, hash, casc_file_size, size);
 }
 
-
-// tjekker for forbindelser, og sætter dem i et array.
-// worker thread
-void* check_for_connections(void* vargp) {
-    printf("inde i check\n");
-    int listen_socket = *((int*)vargp);
-    socklen_t clientlen = sizeof(struct sockaddr_storage);
-    struct sockaddr_storage clientaddr;
-    int* connfdp;
-    char client_hostname[MAXLINE], client_port[MAXLINE];
-
-    while(1) {
-        printf("inde i while\n");
-        connfdp = Malloc(sizeof(int));
-        socket_info_t* new_connection = Malloc(sizeof(socket_info_t));
-        
-        *connfdp = Accept(listen_socket, (SA*) &clientaddr, &clientlen);
-        Getnameinfo((SA *) &clientaddr, clientlen, client_hostname, MAXLINE,
-                    client_port, MAXLINE, 0);
-        printf("Connected to (%s, %s)\n",
-           client_hostname, client_port);
-
-        new_connection->clientaddr = clientaddr;
-        new_connection->clientlen = clientlen;
-        new_connection->connfdp = *(int*)connfdp;
-        if (number_of_connections < MAX_CONNECTIONS) {
-            connections[number_of_connections] = new_connection;
-        }
-
-        // laver en thread, som laver upload
-    }
-
-    Pthread_detach(pthread_self());
-    return NULL;
-}
-
 void check_txt_file(char* cascade_file, int i) {
     if (access(cascade_file, F_OK ) != 0 ) {
         fprintf(stderr, ">> File %s does not exist\n", cascade_file);
@@ -147,11 +111,12 @@ void check_txt_file(char* cascade_file, int i) {
 
     printf("casc_files værdier initialiseret\n");
 
-    csc_block_t missing_blocks[i][casc_files[i]->blockcount];
+    csc_block_t missing_blocks[casc_files[i]->blockcount];
+    printf("%d", casc_files[i]->blockcount);
     for (uint64_t j = 0; j < casc_files[i]->blockcount; j++) {
         if (casc_files[i]->blocks[j].completed == 0) {
             printf("inde i løkken\n");
-            missing_blocks[i][casc_files[i]->uncomp_count] = casc_files[i]->blocks[j];
+            missing_blocks[casc_files[i]->uncomp_count] = casc_files[i]->blocks[j];
             casc_files[i]->uncomp_count++;
             printf("inde i løkken 2\n");
         }
@@ -165,21 +130,19 @@ void check_txt_file(char* cascade_file, int i) {
         casc_files[i]->got_all_blocks = 1;
     }
     printf("tjek om alle blocks er der\n");
+    // for (int j = 0; j < strlen(casc_files[i]->name); j++) {
+    //     if (casc_files[i]->name[j] != "tests/shakespeare.1mib.txt.cascade"[j]) {
+    //         printf("indexes: %d doesnt match: %c =/= %c", j, (casc_files[i]->name[j]), "tests/shakespeare.1mib.txt.cascade"[j]);
+    //     }
+    // }
     hashdata_t hash_buf;
     printf("%s\n", casc_files[i]->name);
     get_file_sha(casc_files[i]->name, hash_buf, SHA256_HASH_SIZE);
     printf("hallo\n");
-    if (casc_files[i]->name == "tests/shakespeare.1mib.txt.cascade\0") {
-        printf("De er ens\n");
-    } else {
-        printf("De er ikke ens\n");
-        printf("%s", casc_files[i]->name[strlen(casc_files[i]->name - 1)]);
-        
-    }
-    // if (memcmp(&casc_files[i]->hash, hash_buf, SHA256_HASH_SIZE) != 0) {
-    //     printf("fejl\n");
-    // }
-    printf("yes\n");
+    *casc_files[i]->hash = Malloc(sizeof(hashdata_t));
+    printf("før memcmp\n");
+    memcmp(casc_files[i]->hash, hash_buf, SHA256_HASH_SIZE);
+    printf("efter memcmp\n");
 }
 
 
@@ -605,12 +568,12 @@ int main(int argc, char **argv) {
     printf("Cascade files inserted\n");
     output_files = Malloc(strlen(cascade_files));
     printf("output\n");
-    casc_files = Malloc(sizeof(csc_file_t*) * casc_count);
+    casc_files = Malloc(sizeof(csc_file_t) * casc_count);
     printf("casc\n");
     queue = Malloc(10000 * sizeof(csc_block_t*) * casc_count);
     printf("queue\n");
     // Laver en csc_file og sætter den en i det globale csc_files array
-    for (int j = 0; j < 1; j++) {
+    for (int j = 0; j < casc_count; j++) {
         printf("inden %d\n", j);
         printf("casc count: %d\n", casc_count);
         check_txt_file(cascade_files[j], j); // Thread?
@@ -626,20 +589,51 @@ int main(int argc, char **argv) {
         }   
     }
     printf("subscribe run\n");
-    // checker for nye forbindelser
-    int listenfd = Open_listenfd(my_port);
-    connections = Malloc(sizeof(socket_info_t) * MAX_CONNECTIONS);
-    Pthread_create(&tid, NULL, check_for_connections, &listenfd);
+    printf("Peer port: %d\n", casc_files[0]->peers[0].port);
 
-    // checker om der mangler blocks, og kører download, hvis der gør
     for (int j = 0; j < casc_count; j++) {
         if (casc_files[j]->got_all_blocks != 0) {
             Pthread_create(&tid, NULL, download_only_peer, &casc_files[j]);
         }
     }
+    printf("Efter download\n");
 
-    exit(EXIT_SUCCESS);
+    // åbner port til at lytte
+    int listenfd = Open_listenfd(my_port);
+    connections = Malloc(sizeof(socket_info_t) * MAX_CONNECTIONS);
+
+    // tjekker for forbindelser og sætter ind i array
+    printf("connection sat op\n");
+    socklen_t clientlen = sizeof(struct sockaddr_storage);
+    struct sockaddr_storage clientaddr;
+    int* connfdp;
+    char client_hostname[MAXLINE], client_port[MAXLINE];
+
+    while(1) {
+        printf("inde i while\n");
+        connfdp = Malloc(sizeof(int));
+        socket_info_t* new_connection = Malloc(sizeof(socket_info_t));
+        
+        *connfdp = Accept(listenfd, (SA*) &clientaddr, &clientlen);
+        Getnameinfo((SA *) &clientaddr, clientlen, client_hostname, MAXLINE,
+                    client_port, MAXLINE, 0);
+        printf("Connected to (%s, %s)\n",
+           client_hostname, client_port);
+
+        new_connection->clientaddr = clientaddr;
+        new_connection->clientlen = clientlen;
+        new_connection->connfdp = *(int*)connfdp;
+        if (number_of_connections < MAX_CONNECTIONS) {
+            connections[number_of_connections] = new_connection;
+        }
+
+    }
+    
+
+    printf("Efter listen\n");
+    // checker om der mangler blocks, og kører download, hvis der gør
 }
+
 
 // søg på:
 // Skal vi lukke connection???
