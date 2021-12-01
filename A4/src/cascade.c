@@ -1,4 +1,4 @@
-#include <stdlib.h>
+ #include <stdlib.h>
 #include <stdio.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -70,6 +70,7 @@ void get_file_sha(const char* sourcefile, hashdata_t hash, int size) {
         printf("Failed to open source: %s\n", sourcefile);
         return;
     }
+    printf("fil åbnet\n");
 
     fseek(fp, 0L, SEEK_END);
     casc_file_size = ftell(fp);
@@ -123,10 +124,10 @@ void check_txt_file(char* cascade_file, int i) {
         fprintf(stderr, ">> File %s does not exist\n", cascade_file);
         exit(EXIT_FAILURE);
     }
+    printf("%s\n", cascade_file);
+    char* name = Malloc(strlen(cascade_file));
+    memcpy(name, cascade_file, strlen(cascade_file));
     printf("første tjek i check_txt_file\n");
-    printf("output_files[i] = Malloc(strlen(cascade_file));\n");
-    output_files = Malloc(strlen(cascade_file));
-    printf("memcpy(output_files[i], cascade_file, strlen(cascade_file));\n");
     memcpy(output_files, cascade_file, strlen(cascade_file));
     printf("char* r = strstr(cascade_file, cascade);\n");
     char* r = strstr(cascade_file, "cascade");
@@ -138,20 +139,25 @@ void check_txt_file(char* cascade_file, int i) {
     printf("efter memcpy\n");
     // tjek om output_files altid har været **
     casc_files[i] = csc_parse_file(cascade_file, output_files);
+    printf("Efter parse\n");
 
     casc_files[i]->uncomp_count = 0;
     casc_files[i]->index = i;
-    casc_files[i]->name = cascade_file;
+    casc_files[i]->name = name;
 
     printf("casc_files værdier initialiseret\n");
-    queue[i] = Malloc(casc_files[i]->blockcount * sizeof(csc_block_t*));
 
-    printf("queue lavet\n");
+    csc_block_t missing_blocks[i][casc_files[i]->blockcount];
     for (uint64_t j = 0; j < casc_files[i]->blockcount; j++) {
         if (casc_files[i]->blocks[j].completed == 0) {
-            queue[i][casc_files[i]->uncomp_count] = &casc_files[i]->blocks[j];
+            printf("inde i løkken\n");
+            missing_blocks[i][casc_files[i]->uncomp_count] = casc_files[i]->blocks[j];
+            casc_files[i]->uncomp_count++;
+            printf("inde i løkken 2\n");
         }
     }
+    queue[i] = &missing_blocks;
+
     printf("ting puttet i køen\n");
     if (casc_files[i]->uncomp_count == 0) {
         printf("All blocks are already present, skipping external connections.\n");
@@ -160,7 +166,10 @@ void check_txt_file(char* cascade_file, int i) {
     }
     printf("tjek om alle blocks er der\n");
     hashdata_t hash_buf;
+    printf("%s\n", cascade_file);
+    printf("%s\n", casc_files[i]->name);
     get_file_sha(casc_files[i]->name, hash_buf, SHA256_HASH_SIZE);
+    printf("hallo\n");
     casc_files[i]->hash = &hash_buf;
     printf("hash lavet\n");
 }
@@ -225,11 +234,13 @@ int count_occurences(char string[], char c) {
  * Returns a pointer to a datastructure describing the file, or NULL if the file could not be parsed
  */
 csc_file_t* csc_parse_file(const char* sourcefile, const char* destination) {
+    printf("Inden fopen\n");
     FILE* fp = Fopen(sourcefile, "rb");
     if (fp == 0) {
         printf("Failed to open source: %s\n", sourcefile);
         return NULL;
     }
+    printf("Efter fopen\n");
 
     const int FILE_HEADER_SIZE = 8 + 8 + 8 + 8 + 32;
 
@@ -245,7 +256,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination) {
         Fclose(fp);
         return NULL;
     }
-
+    printf("Inden res\n");
     csc_file_t* res = (csc_file_t*) Malloc(sizeof(csc_file_t));
     res->targetsize = be64toh(*((unsigned long long*)&header[16]));
     res->blocksize = be64toh(*((unsigned long long*)&header[24]));
@@ -263,7 +274,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination) {
         Fclose(fp);
         return NULL;
     }
-
+    printf("Inden forløkken\n");
     for(uint64_t i = 0; i < res->blockcount; i++) {
         csc_block_t* b = &res->blocks[i];
         b->index = i;
@@ -277,7 +288,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination) {
             return NULL;
         }
     }
-
+    printf("Inden fclose\n");
     Fclose(fp);
 
     fp = Fopen(destination, "a+w");
@@ -294,7 +305,7 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination) {
         Fclose(fp);
         return NULL;
     }
-
+    printf("Inden hash\n");
     SHA256_CTX shactx;
     for(uint64_t i = 0; i < res->blockcount; i++) {
         hashdata_t shabuffer;
@@ -313,9 +324,12 @@ csc_file_t* csc_parse_file(const char* sourcefile, const char* destination) {
 
         res->blocks[i].completed = 1;
     }
+    printf("Inden fclose 2\n");
     Fclose(fp);
     Free(buffer);
+    printf("free\n");
     return res;
+    printf("færdig med parse\n");
 }
 
 /*
@@ -581,9 +595,17 @@ int main(int argc, char **argv) {
     }
 
     printf("Cascade files inserted\n");
+    output_files = Malloc(strlen(cascade_files));
+    printf("output\n");
+    casc_files = Malloc(sizeof(csc_file_t*) * casc_count);
+    printf("casc\n");
+    queue = Malloc(1000 * sizeof(csc_block_t*) * casc_count);
+    printf("queue\n");
     // Laver en csc_file og sætter den en i det globale csc_files array
     for (int j = 0; j < casc_count; j++) {
+        printf("inden %d\n", j);
         check_txt_file(cascade_files[j], j); // Thread?
+        printf("efter %d\n", j);
     }
     printf("check_txt_file run\n");
     // For hver csc_file subscriber vi 
