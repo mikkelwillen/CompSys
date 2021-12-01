@@ -1,4 +1,4 @@
-GCC=gcc -O3 -g -Wall -Wextra -pedantic -std=gnu11
+GCC=gcc -O3 -g -Wall -Wextra -pedantic -std=gnu11 -fno-stack-protector
 LD_FLAGS= -lpthread
 
 all: cascade

@@ -78,7 +78,7 @@ typedef struct csc_file {
     int index;
     char* name;
     struct csc_peer* peers;
-    hashdata_t* hash;
+    hashdata_t hash;
     int peercount;
 } csc_file_t;
 

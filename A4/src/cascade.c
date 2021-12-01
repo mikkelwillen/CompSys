@@ -166,12 +166,20 @@ void check_txt_file(char* cascade_file, int i) {
     }
     printf("tjek om alle blocks er der\n");
     hashdata_t hash_buf;
-    printf("%s\n", cascade_file);
     printf("%s\n", casc_files[i]->name);
     get_file_sha(casc_files[i]->name, hash_buf, SHA256_HASH_SIZE);
     printf("hallo\n");
-    casc_files[i]->hash = &hash_buf;
-    printf("hash lavet\n");
+    if (casc_files[i]->name == "tests/shakespeare.1mib.txt.cascade\0") {
+        printf("De er ens\n");
+    } else {
+        printf("De er ikke ens\n");
+        printf("%s", casc_files[i]->name[strlen(casc_files[i]->name - 1)]);
+        
+    }
+    // if (memcmp(&casc_files[i]->hash, hash_buf, SHA256_HASH_SIZE) != 0) {
+    //     printf("fejl\n");
+    // }
+    printf("yes\n");
 }
 
 
@@ -599,11 +607,12 @@ int main(int argc, char **argv) {
     printf("output\n");
     casc_files = Malloc(sizeof(csc_file_t*) * casc_count);
     printf("casc\n");
-    queue = Malloc(1000 * sizeof(csc_block_t*) * casc_count);
+    queue = Malloc(10000 * sizeof(csc_block_t*) * casc_count);
     printf("queue\n");
     // Laver en csc_file og sætter den en i det globale csc_files array
-    for (int j = 0; j < casc_count; j++) {
+    for (int j = 0; j < 1; j++) {
         printf("inden %d\n", j);
+        printf("casc count: %d\n", casc_count);
         check_txt_file(cascade_files[j], j); // Thread?
         printf("efter %d\n", j);
     }
