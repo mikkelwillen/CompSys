@@ -43,6 +43,13 @@ struct ClientResponseHeader {
     uint64_t length;
 };
 
+// ny struct 
+struct UploadData {
+    hashdata_t hash;
+    socket_info_t* connection;
+    int ostehaps;
+};
+
 #include <stdint.h>
 
 typedef struct csc_ipport {
@@ -80,6 +87,8 @@ typedef struct csc_file {
     struct csc_peer* peers;
     hashdata_t hash;
     int peercount;
+    csc_block_t* missing_blocks;
+    char* output_file;
 } csc_file_t;
 
 

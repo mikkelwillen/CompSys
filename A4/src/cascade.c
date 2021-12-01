@@ -20,8 +20,6 @@ char my_ip[IP_LEN];
 char my_port[PORT_LEN];
 
 struct csc_file** casc_files;
-char** output_files;
-csc_block_t*** queue;
 struct socket_info** connections;
 int number_of_connections = 0;
 
@@ -31,7 +29,6 @@ int number_of_connections = 0;
 
 // der skal free's alle peers og alle casc_files
 void free_resources() {
-    // free(queue);
     // free(casc_files[0]->peers);
     // csc_free_file(*casc_files);
 }
@@ -87,28 +84,41 @@ void check_txt_file(char* cascade_file, int i) {
         fprintf(stderr, ">> File %s does not exist\n", cascade_file);
         exit(EXIT_FAILURE);
     }
+    printf("%s", cascade_file);
+    char** output_files_temp = Malloc(strlen(cascade_file));
+    printf("er det her2?\n");
     char* name = Malloc(strlen(cascade_file));
+    printf("er det her3?\n");
     memcpy(name, cascade_file, strlen(cascade_file));
-    memcpy(output_files, cascade_file, strlen(cascade_file));
+    printf("er det her4?\n");
+    memcpy(output_files_temp, cascade_file, strlen(cascade_file));
+    printf("er det her5?\n");
     char* r = strstr(cascade_file, "cascade");
+    printf("er det her6?\n");
     int cutoff = r - cascade_file;
-    output_files[cutoff - 1] = '\0';
-
-    casc_files[i] = csc_parse_file(cascade_file, output_files);
+    printf("%d", cutoff);
+    printf("output før: %s\n", output_files_temp);
+    output_files_temp[cutoff - 1] = '\0';
+    printf("output efter: %s\n", output_files_temp);
+    char* new_temp = (char*) output_files_temp;
+    new_temp[cutoff - 1] = '\0';
+    printf("%s\n", new_temp);
+    casc_files[i] = csc_parse_file(cascade_file, new_temp);
+    casc_files[i]->output_file = output_files_temp;
 
     casc_files[i]->uncomp_count = 0;
     casc_files[i]->index = i;
     casc_files[i]->name = name;
-
-    csc_block_t missing_blocks[casc_files[i]->blockcount];
-    printf("%d", casc_files[i]->blockcount);
+    printf("wat\n");
+    casc_files[i]->missing_blocks = Malloc(sizeof(csc_block_t) * casc_files[i]->blockcount);
+    
+    printf("Blockcount: %d", casc_files[i]->blockcount);
     for (uint64_t j = 0; j < casc_files[i]->blockcount; j++) {
         if (casc_files[i]->blocks[j].completed == 0) {
-            missing_blocks[casc_files[i]->uncomp_count] = casc_files[i]->blocks[j];
+            casc_files[i]->missing_blocks[casc_files[i]->uncomp_count] = casc_files[i]->blocks[j];
             casc_files[i]->uncomp_count++;
         }
     }
-    queue[i] = &missing_blocks;
 
     if (casc_files[i]->uncomp_count == 0) {
         printf("All blocks are already present, skipping external connections.\n");
@@ -119,7 +129,7 @@ void check_txt_file(char* cascade_file, int i) {
     hashdata_t hash_buf;
     get_file_sha(casc_files[i]->name, hash_buf, SHA256_HASH_SIZE);
     *casc_files[i]->hash = Malloc(sizeof(hashdata_t));
-    memcmp(casc_files[i]->hash, hash_buf, SHA256_HASH_SIZE);
+    memcpy(casc_files[i]->hash, hash_buf, SHA256_HASH_SIZE);
     printf("check_txt_file succesful");
 }
 
@@ -129,7 +139,7 @@ void check_txt_file(char* cascade_file, int i) {
  * E.g. parse a cascade file and get all the relevent data from somewhere else on the
  * network.
  */
-void download_only_peer(void* vargp) {
+void download(void* vargp) {
     printf("Inside download\n");
     csc_file_t* cascade_file = ((csc_file_t *)vargp);
     printf("Managing download only for: %s\n", cascade_file->name);
@@ -147,7 +157,9 @@ void download_only_peer(void* vargp) {
 
     printf("Downloading blocks\n");
     for (int i = 0; i < cascade_file->uncomp_count; i++) {
-        get_block(queue[cascade_file->index][i], peer, *cascade_file->hash, output_files[cascade_file->index]);
+        printf("forloop download blocks\n");
+        get_block(&cascade_file->missing_blocks[i], peer, cascade_file->hash, cascade_file->output_file);
+        printf("efter get_block\n");
     }
 
     printf("File downloaded successfully\n");
@@ -158,12 +170,6 @@ void download_only_peer(void* vargp) {
     Pthread_detach(pthread_self());
 }
 
-void upload() {
-    // vi skal finde ud af, hvilke argumenter denne funktion skal bruge
-    // siden det er en thread, skal den kun tage et argument
-    // vi skal finde ud af, hvordan vi sender blocks via protocollen
-    // 
-}
 
 /*
  * Count how many times a character occurs in a string
@@ -495,6 +501,45 @@ void subscribe(csc_file_t* casc_file, int command) {
     Close(tracker_socket); //Skal vi lukke connection???
 }
 
+void upload(void* vargp) {
+    int connfd = *((int *)vargp);
+
+    // det giver sgu ikke helt mening det her :)
+    char msg_buf[MAXLINE];
+    rio_t rio;
+
+    Rio_readnb(&rio, msg_buf, MAXLINE);
+
+    char request_header[PEER_REQUEST_HEADER_SIZE];
+    memcpy(request_header, msg_buf, PEER_REQUEST_HEADER_SIZE);
+
+    uint64_t msglen = be64toh(*(uint64_t*)&request_header[0]);
+
+    if (msglen == 0) {
+            // send errorcode
+    }
+
+    if (msglen != 64) {
+        // send error code: not the right format
+    }
+    
+    char* block_data = Calloc(msglen+1, sizeof(char));
+    hashdata_t block_hash;
+    struct ClientRequest* request = Malloc(sizeof(struct ClientRequest));
+
+    strcpy(block_data, msg_buf);
+    memcpy(request->protocol, block_data, 8);
+    memcpy(request->reserved, block_data + 8, 16);
+    memcpy(request->block_num, block_data + 24, 8);
+    memcpy(request->hash, block_data + 32, 32);
+
+    if (request->protocol != "CASCADE1") {
+        // send error: forkert protocol
+    }
+
+    
+}
+
 /*
  * The entry point for the code. Parses command line arguments and starts up the appropriate peer code.
  */
@@ -544,10 +589,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    output_files = Malloc(strlen(cascade_files));
     casc_files = Malloc(sizeof(csc_file_t) * casc_count);
-    queue = Malloc(10000 * sizeof(csc_block_t*) * casc_count);
-
+    printf("inden txt check\n");
     // Laver en csc_file og sætter den en i det globale csc_files array
     for (int j = 0; j < casc_count; j++) {
         check_txt_file(cascade_files[j], j); // Thread?
@@ -567,10 +610,9 @@ int main(int argc, char **argv) {
     printf("casc count: %d\n", casc_count);
 
     for (int j = 0; j < casc_count; j++) {
-        printf("%d\n", casc_files[j]->got_all_blocks);
+        printf("har alle blocks: %d\n", casc_files[j]->got_all_blocks);
         if (!casc_files[j]->got_all_blocks) {
-            // Pthread_create(&tid, NULL, download_only_peer, &casc_files[j]);
-            download_only_peer(casc_files[j]);
+            Pthread_create(&tid, NULL, download, casc_files[j]);
         }
     }
     printf("Efter download\n");
@@ -601,7 +643,11 @@ int main(int argc, char **argv) {
         new_connection->clientlen = clientlen;
         new_connection->connfdp = *(int*)connfdp;
         if (number_of_connections < MAX_CONNECTIONS) {
-            connections[number_of_connections] = new_connection;
+            struct UploadData* upload_data = Malloc(sizeof(struct UploadData));
+            upload_data->connection = new_connection;
+            upload_data->ostehaps = connfdp;
+            // mere data i upload_data
+            Pthread_create(&tid, NULL, upload, upload_data);
         }
 
     }
@@ -610,3 +656,6 @@ int main(int argc, char **argv) {
 
 // søg på:
 // Skal vi lukke connection???
+
+// Den fejler når vi allerede har txt-filerne
+// Den prøver at connecte med fx python-peer selvom den er lukket
