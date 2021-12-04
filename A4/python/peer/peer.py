@@ -210,6 +210,7 @@ class CascadePeerServe(socketserver.StreamRequestHandler):
         while True:
             try:
                 header = self.request.recv(self.HEADER_LENGTH)
+                print(header)
             except:
                 return
 

@@ -302,7 +302,12 @@ void get_block(csc_block_t* block, csc_peer_t peer, hashdata_t hash, char* outpu
     client_request.block_num = htobe64(block->index);
     memcpy(client_request.hash, hash, SHA256_HASH_SIZE);
 
-    memcpy(msg_buf, &client_request, PEER_REQUEST_HEADER_SIZE);
+    memcpy(msg_buf, &client_request.protocol, 8);
+    memcpy(msg_buf + 8, &client_request.reserved, 16);
+    memcpy(msg_buf + 24, &client_request.block_num, 8);
+    memcpy(msg_buf + 32, &client_request.hash, 32);
+    // memcpy(msg_buf, &client_request, PEER_REQUEST_HEADER_SIZE);
+    printf("msg_buf: %s\n", msg_buf + 24);
 
     Rio_writen(peer_socket, msg_buf, PEER_REQUEST_HEADER_SIZE);
 
@@ -488,22 +493,23 @@ void subscribe(csc_file_t* casc_file, int command) {
 void upload(void* vargp) {
     printf("Inde i upload\n");
     int connfdp = *((int *)vargp);
-    printf("efter\n");
+    printf("efter conn\n");
 
-    char msg_buf[MAXLINE];
+    char msg_buf[PEER_REQUEST_HEADER_SIZE];
     rio_t rio;
     printf("Efter rio\n");
     Rio_readinitb(&rio, connfdp);
     printf("EFter init\n");
     Rio_readnb(&rio, msg_buf, MAXLINE);
     printf("efter read\n");
+    printf("msg_buf: %s\n", msg_buf);
 
     char request_header[PEER_REQUEST_HEADER_SIZE];
     memcpy(request_header, msg_buf, PEER_REQUEST_HEADER_SIZE);
     printf("efter requestheader\n");
 
-    uint64_t msglen = PEER_RESPONSE_HEADER_SIZE;
-    printf("msglen: %d", msglen);
+    uint64_t msglen = PEER_REQUEST_HEADER_SIZE;
+    printf("msglen: %d\n", msglen);
     uint64_t response_len;
     char response_buf[MAXLINE];
     printf("efter response buf\n");
@@ -529,39 +535,44 @@ void upload(void* vargp) {
 
     printf("efter første tjek\n");
     
-    char* block_data = Calloc(msglen+1, sizeof(char));
+    char* block_data = Calloc(msglen + 1, sizeof(char));
     hashdata_t block_hash;
     struct ClientRequest* request = Malloc(sizeof(struct ClientRequest));
+    printf("efter calloc\n");
 
     strcpy(block_data, msg_buf);
     memcpy(request->protocol, block_data, 8);
     memcpy(request->reserved, block_data + 8, 16);
     request->block_num = be64toh(&block_data[24]);
     memcpy(request->hash, block_data + 32, 32);
-    printf("request\n");
+    printf("protocol: %s\n", &request->protocol);
+    printf("reserverd: %s\n", &request->reserved);
+    printf("block_num: %s\n", &request->block_num);
+    printf("hash: %s\n", &request->hash);
+    printf("efter request\n");
 
     if (strcmp(request->protocol, "CASCADE1")) {
-        printf("");
         *response_header->error = '4';
         response_header->length = strlen("Failed to parse request");
         char* temp = "Failed to parse request";
-        memcpy(response_header, response_buf, PEER_RESPONSE_HEADER_SIZE);
-        memcpy(temp, &response_buf[PEER_RESPONSE_HEADER_SIZE], strlen(temp));
+        memcpy(response_buf, response_header, PEER_RESPONSE_HEADER_SIZE);
+        memcpy(&response_buf[PEER_RESPONSE_HEADER_SIZE], temp, strlen(temp));
         Rio_writen(connfdp, response_buf, response_header->length);
     }
+
+    printf("cascade1 tjek\n");
 
     for (int i = 0; i < casc_file_number; i++) {
         if (casc_files[i]->hash == request->hash && casc_files[i]->got_all_blocks) {
             *response_header->error = '0';
             response_header->length = casc_files[i]->blocksize;
-            char* temp;
-            memcpy(temp, response_buf, strlen(temp));
+
             FILE* file = fopen(casc_files[i]->output_file, "r");
             fseek(file, casc_files[i]->blocksize * request->block_num, SEEK_SET);
             char* block[casc_files[i]->blocksize];
             fread(block, 1, casc_files[i]->blocksize, file);
-            memcpy(response_header, response_buf, PEER_RESPONSE_HEADER_SIZE);
-            memcpy(block, &response_buf[PEER_RESPONSE_HEADER_SIZE], casc_files[i]->blocksize);
+            memcpy(response_buf, response_header, PEER_RESPONSE_HEADER_SIZE);
+            memcpy(&response_buf[PEER_RESPONSE_HEADER_SIZE], block, casc_files[i]->blocksize);
             Rio_writen(connfdp, response_buf, response_header->length);
             break;
         } else if (!casc_files[i]->got_all_blocks) {
@@ -569,20 +580,23 @@ void upload(void* vargp) {
             response_len = strlen("Block not present");
             response_header->length = sizeof(struct ClientResponseHeader) + response_len;
             char* temp = "Block not present";
-            memcpy(response_header, response_buf, PEER_RESPONSE_HEADER_SIZE);
-            memcpy(temp, &response_buf[PEER_RESPONSE_HEADER_SIZE], strlen(temp));
+            memcpy(response_buf, response_header, PEER_RESPONSE_HEADER_SIZE);
+            memcpy(&response_buf[PEER_RESPONSE_HEADER_SIZE], temp, strlen(temp));
             Rio_writen(connfdp, response_buf, response_header->length);
+            break;
         }
     }
+    printf("efter send block\n");
 
-    // hvis den kommer her til, har vi ikke blocken
+    // hvis den kommer her til, har vi forkert hash
     *response_header->error = '1';
     response_len = strlen("Invalid hash");
     response_header->length = sizeof(struct ClientResponseHeader) + response_len;
     char* temp = "Invalid hash";
-    memcpy(response_header, response_buf, PEER_RESPONSE_HEADER_SIZE);
-    memcpy(temp, &response_buf[PEER_RESPONSE_HEADER_SIZE], strlen(temp));
+    memcpy(response_buf, response_header, PEER_RESPONSE_HEADER_SIZE);
+    memcpy(&response_buf[PEER_RESPONSE_HEADER_SIZE], temp, strlen(temp));
     Rio_writen(connfdp, response_buf, response_header->length);
+    printf("bedsked sendt\n");
 }
 
 /*
@@ -667,11 +681,11 @@ int main(int argc, char **argv) {
     socklen_t clientlen = sizeof(struct sockaddr_storage);
     struct sockaddr_storage clientaddr;
     int* connfdp;
+    connfdp = Malloc(sizeof(int));
     char client_hostname[MAXLINE], client_port[MAXLINE];
 
     while(1) {
         printf("Waiting for connections\n");
-        connfdp = Malloc(sizeof(int));
         
         *connfdp = Accept(listenfd, (SA*) &clientaddr, &clientlen);
         Getnameinfo((SA *) &clientaddr, clientlen, client_hostname, MAXLINE,
