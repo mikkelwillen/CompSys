@@ -302,15 +302,19 @@ void get_block(csc_block_t* block, csc_peer_t peer, hashdata_t hash, char* outpu
     struct ClientRequest client_request;
     // memcpy as we don't have space for terminating null.
     memcpy(client_request.protocol, "CASCADE1", sizeof(client_request.protocol));
+    memcpy(client_request.reserved, "0000000000000000", sizeof(client_request.reserved));
 
     client_request.block_num = htobe64(block->index);
     memcpy(client_request.hash, hash, SHA256_HASH_SIZE);
+    printf("hash: %s\n", &client_request.hash);
+    printf("block_num: %ld\n", &client_request.block_num);
+    printf("reserved: %s\n", &client_request.reserved);
 
-    memcpy(msg_buf, &client_request.protocol, 8);
-    memcpy(msg_buf + 8, &client_request.reserved, 16);
-    memcpy(msg_buf + 24, &client_request.block_num, 8);
-    memcpy(msg_buf + 32, &client_request.hash, 32);
-    // memcpy(msg_buf, &client_request, PEER_REQUEST_HEADER_SIZE);
+    // memcpy(msg_buf, &client_request.protocol, 8);
+    // memcpy(msg_buf + 8, &client_request.reserved, 16);
+    // memcpy(msg_buf + 24, &client_request.block_num, 8);
+    // memcpy(msg_buf + 32, &client_request.hash, 32);
+    memcpy(msg_buf, &client_request, PEER_REQUEST_HEADER_SIZE);
     printf("msg_buf: %s\n", msg_buf);
 
     Rio_writen(peer_socket, msg_buf, PEER_REQUEST_HEADER_SIZE);
@@ -504,7 +508,7 @@ void upload(void* vargp) {
     printf("Efter rio\n");
     Rio_readinitb(&rio, connfdp);
     printf("EFter init\n");
-    Rio_readnb(&rio, msg_buf, MAXLINE);
+    Rio_readnb(&rio, msg_buf, 64);
     printf("efter read\n");
     printf("msg_buf: %s\n", msg_buf);
 
@@ -699,9 +703,16 @@ int main(int argc, char **argv) {
                     client_port, MAXLINE, 0);
         printf("Connected to (%s, %s)\n",
            client_hostname, client_port);
+        rio_t rio;
+        char* msg_buf[MAXLINE];
+        Rio_readinitb(&rio, *connfdp);
+        Rio_readlineb(&rio, msg_buf, MAXLINE);
+        
+        // Rio_readnb(&rio, msg_buf + 16, 16);
+        printf("msg_buf main: %s\n", msg_buf);
+        
 
         Pthread_create(&tid, NULL, upload, connfdp);
-
     }
 }
 

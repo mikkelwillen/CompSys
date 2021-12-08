@@ -18,6 +18,7 @@ char tracker_ip[IP_LEN];
 char tracker_port[PORT_LEN];
 char my_ip[IP_LEN];
 char my_port[PORT_LEN];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct csc_file** casc_files;
 int casc_file_number = 0;
@@ -93,6 +94,7 @@ void check_txt_file(char* cascade_file, int i) {
     output_files_temp[cutoff - 1] = '\0';
     char* new_temp = (char*) output_files_temp;
     new_temp[cutoff - 1] = '\0';
+    pthread_mutex_lock(&mutex);
     casc_files[i] = csc_parse_file(cascade_file, new_temp);
     casc_files[i]->output_file = output_files_temp;
 
@@ -101,6 +103,7 @@ void check_txt_file(char* cascade_file, int i) {
     casc_files[i]->name = name;
     casc_files[i]->missing_blocks = Malloc(sizeof(csc_block_t) * casc_files[i]->blockcount);
     
+
     for (uint64_t j = 0; j < casc_files[i]->blockcount; j++) {
         if (casc_files[i]->blocks[j].completed == 0) {
             casc_files[i]->missing_blocks[casc_files[i]->uncomp_count] = casc_files[i]->blocks[j];
@@ -119,6 +122,7 @@ void check_txt_file(char* cascade_file, int i) {
     *casc_files[i]->hash = Malloc(sizeof(hashdata_t));
     memcpy(casc_files[i]->hash, hash_buf, SHA256_HASH_SIZE);
     printf("check_txt_file succesful\n");
+    pthread_mutex_unlock(&mutex);
 }
 
 
@@ -298,16 +302,20 @@ void get_block(csc_block_t* block, csc_peer_t peer, hashdata_t hash, char* outpu
     struct ClientRequest client_request;
     // memcpy as we don't have space for terminating null.
     memcpy(client_request.protocol, "CASCADE1", sizeof(client_request.protocol));
+    memcpy(client_request.reserved, "0000000000000000", sizeof(client_request.reserved));
 
     client_request.block_num = htobe64(block->index);
     memcpy(client_request.hash, hash, SHA256_HASH_SIZE);
+    printf("hash: %s\n", &client_request.hash);
+    printf("block_num: %ld\n", &client_request.block_num);
+    printf("reserved: %s\n", &client_request.reserved);
 
-    memcpy(msg_buf, &client_request.protocol, 8);
-    memcpy(msg_buf + 8, &client_request.reserved, 16);
-    memcpy(msg_buf + 24, &client_request.block_num, 8);
-    memcpy(msg_buf + 32, &client_request.hash, 32);
-    // memcpy(msg_buf, &client_request, PEER_REQUEST_HEADER_SIZE);
-    printf("msg_buf: %s\n", msg_buf + 24);
+    // memcpy(msg_buf, &client_request.protocol, 8);
+    // memcpy(msg_buf + 8, &client_request.reserved, 16);
+    // memcpy(msg_buf + 24, &client_request.block_num, 8);
+    // memcpy(msg_buf + 32, &client_request.hash, 32);
+    memcpy(msg_buf, &client_request, PEER_REQUEST_HEADER_SIZE);
+    printf("msg_buf: %s\n", msg_buf);
 
     Rio_writen(peer_socket, msg_buf, PEER_REQUEST_HEADER_SIZE);
 
@@ -500,7 +508,7 @@ void upload(void* vargp) {
     printf("Efter rio\n");
     Rio_readinitb(&rio, connfdp);
     printf("EFter init\n");
-    Rio_readnb(&rio, msg_buf, MAXLINE);
+    Rio_readnb(&rio, msg_buf, 8);
     printf("efter read\n");
     printf("msg_buf: %s\n", msg_buf);
 
@@ -563,6 +571,7 @@ void upload(void* vargp) {
     printf("cascade1 tjek\n");
 
     for (int i = 0; i < casc_file_number; i++) {
+        pthread_mutex_lock(&mutex);
         if (casc_files[i]->hash == request->hash && casc_files[i]->got_all_blocks) {
             *response_header->error = '0';
             response_header->length = casc_files[i]->blocksize;
@@ -585,6 +594,7 @@ void upload(void* vargp) {
             Rio_writen(connfdp, response_buf, response_header->length);
             break;
         }
+        pthread_mutex_unlock(&mutex);
     }
     printf("efter send block\n");
 
@@ -673,6 +683,7 @@ int main(int argc, char **argv) {
             printf("Got all blocks for file: %s\n", casc_files[j]->name);
         }
     }
+    
 
     // åbner port til at lytte
     int listenfd = Open_listenfd(my_port);
@@ -692,9 +703,14 @@ int main(int argc, char **argv) {
                     client_port, MAXLINE, 0);
         printf("Connected to (%s, %s)\n",
            client_hostname, client_port);
+        rio_t rio;
+        char* msg_buf[MAXLINE];
+        Rio_readinitb(&rio, *connfdp);
+        Rio_readnb(&rio, msg_buf, 64);
+        printf("msg_buf main: %ld\n", msg_buf);
+        
 
         Pthread_create(&tid, NULL, upload, connfdp);
-
     }
 }
 
