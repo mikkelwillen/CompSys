@@ -124,7 +124,19 @@ int main(int argc, char* argv[]) {
         // Right now, we can only execute instructions with a size of 2.
         // TODO 2021:
         // from info above determine the instruction size
-        val ins_size = from_int(2); 
+        val ins_size = from_int(is_return_or_stop * 2
+                              + is_reg_arithmetic * 2
+                              + is_imm_arithmetic * 6
+                              + is_reg_movq * 2
+                              + is_imm_movq * 6
+                              + is_reg_movq_mem * 2
+                              + is_imm_movq_mem * 6
+                              + is_cflow * 6
+                              + is_leaq2 * 2
+                              + is_leaq3 * 3
+                              + is_leaq6 * 6
+                              + is_leaq7 * 7
+                              + is_imm_cbranch * 10); 
 
         // broad categorization of the instruction
         bool is_leaq = is_leaq2 || is_leaq3 || is_leaq6 || is_leaq7;
@@ -138,10 +150,26 @@ int main(int argc, char* argv[]) {
         bool imm_i_pos3 = is_leaq7;  /* all other at position 2 */
         bool imm_p_pos6 = is_imm_cbranch; /* all other at position 2 */
 
-        // unimplemented control signals:
-        bool is_load  = false; // TODO 2021: Detect when we're executing a load
-        bool is_store = false; // TODO 2021: Detect when we're executing a store
-        bool is_conditional = false; // TODO 2021: Detect if we are executing a conditional flow change
+        // load or store
+        bool is_minor_load = is(1, minor_op) || is(5, minor_op);
+        bool is_minor_store = is(9, minor_op) || is(13, minor_op);
+        bool is_minor_conditional = is(0, minor_op) || 
+                                    is(1, minor_op) || 
+                                    is(2, minor_op) || 
+                                    is(3, minor_op) ||
+                                    is(4, minor_op) ||
+                                    is(5, minor_op) ||
+                                    is(6, minor_op) ||
+                                    is(7, minor_op) ||
+                                    is(8, minor_op) ||
+                                    is(9, minor_op) ||
+                                    is(10, minor_op) ||
+                                    is(11, minor_op);
+        
+        // unimplemented control signals (not anymore):
+        bool is_load  = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
+        bool is_store = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
+        bool is_conditional =  is_imm_arithmetic && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
 
         // TODO 2021: Add additional control signals you may need below....
 
