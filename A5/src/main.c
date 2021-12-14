@@ -31,6 +31,20 @@
 #define RETURN 0x1
 #define JMP 0xF
 #define CALL 0xE
+#define LOAD_REG 0x1
+#define LOAD_IMM 0x5
+#define STORE_REG 0x9
+#define STORE_IMM 0xD
+#define EQUAL 0x0
+#define NOT_EQUAL 0x1
+#define LESS 0x4
+#define LESSEQUAL 0x5
+#define GREATER 0x6
+#define GREATEREQUAL 0x7
+#define ABOVE 0x8
+#define ABOVEEQUAL 0x9
+#define BELOW 0xA
+#define BELOWEQUAL 0xB
 
 int main(int argc, char* argv[]) {
     // Check command line parameters.
@@ -126,7 +140,7 @@ int main(int argc, char* argv[]) {
         // from info above determine the instruction size
         val ins_size = from_int(is_return_or_stop * 2
                               + is_reg_arithmetic * 2
-                              + is_imm_arithmetic * 6
+                              + is_imm_arithmetic * 6 // hvad fanden skal vi gøre med de her, definer bytes, definer en for hver eller ??
                               + is_reg_movq * 2
                               + is_imm_movq * 6
                               + is_reg_movq_mem * 2
@@ -151,25 +165,24 @@ int main(int argc, char* argv[]) {
         bool imm_p_pos6 = is_imm_cbranch; /* all other at position 2 */
 
         // load or store
-        bool is_minor_load = is(1, minor_op) || is(5, minor_op);
-        bool is_minor_store = is(9, minor_op) || is(13, minor_op);
-        bool is_minor_conditional = is(0, minor_op) || 
-                                    is(1, minor_op) || 
-                                    is(2, minor_op) || 
-                                    is(3, minor_op) ||
-                                    is(4, minor_op) ||
-                                    is(5, minor_op) ||
-                                    is(6, minor_op) ||
-                                    is(7, minor_op) ||
-                                    is(8, minor_op) ||
-                                    is(9, minor_op) ||
-                                    is(10, minor_op) ||
-                                    is(11, minor_op);
+        bool is_minor_load = is(LOAD_REG, minor_op) || is(LOAD_IMM, minor_op);
+        bool is_minor_store = is(STORE_REG, minor_op) || is(STORE_IMM, minor_op);
+        bool is_minor_conditional = is(EQUAL, minor_op) || 
+                                    is(NOT_EQUAL, minor_op) ||
+                                    is(LESS, minor_op) ||
+                                    is(LESSEQUAL, minor_op) ||
+                                    is(GREATER, minor_op) ||
+                                    is(GREATEREQUAL, minor_op) ||
+                                    is(ABOVE, minor_op) ||
+                                    is(ABOVEEQUAL, minor_op) ||
+                                    is(BELOW, minor_op) ||
+                                    is(BELOWEQUAL, minor_op);
         
         // unimplemented control signals (not anymore):
         bool is_load  = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
         bool is_store = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
-        bool is_conditional =  is_imm_arithmetic && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
+        bool is_conditional =  (is_imm_arithmetic || is_cflow) && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
+        bool is_jmp = is_cflow && is(JMP, minor_op);
 
         // TODO 2021: Add additional control signals you may need below....
 
@@ -239,10 +252,17 @@ int main(int argc, char* argv[]) {
                          use_if(use_alu, alu_result)))));
 
         // address of succeeding instruction in memory
-        val pc_incremented  = add(pc, ins_size);
+        val pc_incremented = add(use_if(!is_conditional && !is_jmp, pc),
+                                or(use_if(!is_conditional, ins_size), 
+                                or(use_if((is_conditional || is_jmp) && is_cflow, sext_imm_p),
+                                (use_if(is_conditional && is_imm_cbranch, sext_imm_p)))));
+                                // hvorfor fucker den??? skal vi lave en for hver evt.? 
+                                // lave en samlet for dem alle, som vi kan bruge øverst?
 
         // determine the next position of the program counter
         // TODO 2021: Add any additional sources for the next PC (for call, ret, jmp and conditional branch)
+
+        // hvordan returnere vi en værdi? skal den bare gemmes et bestemt sted???
         val pc_next = pc_incremented;
 
         /*** MEMORY ***/

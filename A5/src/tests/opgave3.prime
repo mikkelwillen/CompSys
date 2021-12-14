@@ -1,0 +1,45 @@
+test:
+    leaq A1, %rdi
+    leaq B1, %rsi
+    leaq OUT, %rdx
+    movq $0, %rax
+    movq $16, %rcx
+    addq %rdi, %rcx
+    jmp L1
+
+L2:
+    movq (%rdi), %rbx
+    movq (%rsi), %r10
+    cbl %rbx, %r10, L3
+    movq %rbx, (%rdx)
+    addq $1, %rax
+    leaq (%rdi, %rax, 8), %rdi
+    leaq (%rsi, %rax, 8), %rsi
+    leaq (%rdx, %rax, 8), %rdx
+
+    jmp L1
+
+L3:
+    movq %r10, (%rdx)
+    addq $1, %rax
+    leaq (%rdi, %rax, 8), %rdi
+    leaq (%rsi, %rax, 8), %rsi
+    leaq (%rdx, %rax, 8), %rdx
+    
+L1:
+    cbl %rdi, %rcx, L2
+    subq $16, %rdx
+    movq (%rdx), %r11
+    ret %r11
+
+A1:
+    .quad 3
+    .quad 17
+
+B1:
+    .quad 4
+    .quad 8
+
+OUT:
+    .quad 0
+    .quad 0
