@@ -27,24 +27,24 @@
 #define IMM_CBRANCH    0xF
 
 // minor opcodes
-#define STOP 0x0
-#define RETURN 0x1
-#define JMP 0xF
-#define CALL 0xE
-#define LOAD_REG 0x1
-#define LOAD_IMM 0x5
-#define STORE_REG 0x9
-#define STORE_IMM 0xD
-#define EQUAL 0x0
-#define NOT_EQUAL 0x1
-#define LESS 0x4
-#define LESSEQUAL 0x5
-#define GREATER 0x6
-#define GREATEREQUAL 0x7
-#define ABOVE 0x8
-#define ABOVEEQUAL 0x9
-#define BELOW 0xA
-#define BELOWEQUAL 0xB
+#define STOP           0x0
+#define RETURN         0x1
+#define JMP            0xF
+#define CALL           0xE
+#define LOAD_REG       0x1
+#define LOAD_IMM       0x5
+#define STORE_REG      0x9
+#define STORE_IMM      0xD
+#define EQUAL          0x0
+#define NOT_EQUAL      0x1
+#define LESS           0x4
+#define LESSEQUAL      0x5
+#define GREATER        0x6
+#define GREATEREQUAL   0x7
+#define ABOVE          0x8
+#define ABOVEEQUAL     0x9
+#define BELOW          0xA
+#define BELOWEQUAL     0xB
 
 int main(int argc, char* argv[]) {
     // Check command line parameters.
@@ -181,8 +181,11 @@ int main(int argc, char* argv[]) {
         // unimplemented control signals (not anymore):
         bool is_load  = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
         bool is_store = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
-        bool is_conditional =  (is_imm_arithmetic || is_cflow) && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
+        bool is_cond_true;
+        bool is_conditional_arithmetic = is_imm_arithmetic && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
+        bool is_conditional_cflows = is_cflow && is_minor_conditional;
         bool is_jmp = is_cflow && is(JMP, minor_op);
+        bool is_normal = !is_call && !is_return && !is_conditional_arithmetic && !is_conditional_cflows && !is_jmp;
 
         // TODO 2021: Add additional control signals you may need below....
 
@@ -200,7 +203,7 @@ int main(int argc, char* argv[]) {
         bool use_multiplier = is_arithmetic && (is(MUL, minor_op) || is(IMUL, minor_op));
         bool use_shifter = is_arithmetic && (is(SAR, minor_op) || is(SAL, minor_op) || is(SHR, minor_op));
         bool use_direct = is_reg_movq || is_imm_movq;
-        bool use_alu = (is_arithmetic || is_conditional) && !(use_shifter | use_multiplier);
+        bool use_alu = (is_arithmetic || is_conditional_arithmetic || is_conditional_cflows) && !(use_shifter | use_multiplier);
 
         // - control for agen
         bool use_s = (is(1,pick_bits(0,1,minor_op)) && use_agen) || is_reg_arithmetic || is_cflow;
@@ -246,18 +249,20 @@ int main(int argc, char* argv[]) {
         val mul_result = multiplier(mul_is_signed, reg_out_a, op_b);
         val shifter_result = shifter(shft_is_left, shft_is_signed, reg_out_a, op_b);
         val compute_result = or(use_if(use_agen, agen_result),
-                    or(use_if(use_multiplier, mul_result),
-                       or(use_if(use_shifter, shifter_result),
-                          or(use_if(use_direct, op_b),
-                         use_if(use_alu, alu_result)))));
+                             or(use_if(use_multiplier, mul_result),
+                             or(use_if(use_shifter, shifter_result),
+                             or(use_if(use_direct, op_b),
+                                use_if(use_alu, alu_result)))));
 
         // address of succeeding instruction in memory
-        val pc_incremented = add(use_if(!is_conditional && !is_jmp, pc),
-                                or(use_if(!is_conditional, ins_size), 
-                                or(use_if((is_conditional || is_jmp) && is_cflow, sext_imm_p),
-                                (use_if(is_conditional && is_imm_cbranch, sext_imm_p)))));
+        val pc_incremented = add(use_if(is_normal, pc),
+                              or(use_if(is_normal, ins_size), 
+                              or(use_if(is_jmp, imm_offset_2),
+                              or(use_if(is_call, imm_offset_2),
+                              or(use_if(is_conditional_arithmetic, imm_offset_6),
+                                 use_if(is_conditional_cflows, imm_offset_2))))));
                                 // hvorfor fucker den??? skal vi lave en for hver evt.? 
-                                // lave en samlet for dem alle, som vi kan bruge øverst?
+                                // tror den ikke evalurer cb funktionerne, og den derfor altid springer videre
 
         // determine the next position of the program counter
         // TODO 2021: Add any additional sources for the next PC (for call, ret, jmp and conditional branch)
@@ -288,6 +293,7 @@ int main(int argc, char* argv[]) {
         // terminate when returning to zero
         if (is_stop || (pc_next.val == 0 && is_return)) stop = true;
     }
+    
     memory_destroy(mem);
     regs_destroy(regs);
 
