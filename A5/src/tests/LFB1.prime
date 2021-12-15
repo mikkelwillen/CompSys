@@ -1,0 +1,26 @@
+test:
+    subq $8, %rsp
+    movq %r11, (%rsp)
+    leaq (%rdi, %rcx, 8), %r8
+    jmp .L6
+
+.L7:
+    movq %rax, (%rdi)
+
+.L8:
+    addq $8, %rdi
+    addq $8, %rsi
+    addq $8, %rdx
+
+.L6:
+    cbbe %r8, %rdi, .L10
+    movq (%rsi), %rcx
+    movq (%rdx), %rax
+    cbge %rax, %rcx, .L7
+    movq %rcx, (%rdi)
+    jmp .L8
+
+.L10:
+    movq (%rsp), %r11
+    addq $8, %rsp
+    ret %r11
