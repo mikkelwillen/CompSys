@@ -12,10 +12,10 @@ set -e
 make
 
 # The command with which you run PRUN: You should likely change this variable
-PRUN=../../../x86prime/prun
+PRUN=../../../x86prime/prun # mikkel laptop
 
 # The command with which you run PRASM: You should likely change this variable
-PRASM=../../../x86prime/prasm
+PRASM=../../../x86prime/prasm # mikkel laptop
 
 TESTLOC=tests
 TESTDIR=test_runs
