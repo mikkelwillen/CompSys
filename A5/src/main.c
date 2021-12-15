@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
         // from info above determine the instruction size
         val ins_size = from_int(is_return_or_stop * 2
                               + is_reg_arithmetic * 2
-                              + is_imm_arithmetic * 6 // hvad fanden skal vi gøre med de her, definer bytes, definer en for hver eller ??
+                              + is_imm_arithmetic * 6 // hvad fanden skal vi gøre med de her, definer bytes, definer en for hver eller ???
                               + is_reg_movq * 2
                               + is_imm_movq * 6
                               + is_reg_movq_mem * 2
@@ -181,7 +181,6 @@ int main(int argc, char* argv[]) {
         // unimplemented control signals (not anymore):
         bool is_load  = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
         bool is_store = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
-        bool is_cond_true;
         bool is_conditional_arithmetic = is_imm_arithmetic && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
         bool is_conditional_cflows = is_cflow && is_minor_conditional;
         bool is_jmp = is_cflow && is(JMP, minor_op);
@@ -209,6 +208,7 @@ int main(int argc, char* argv[]) {
         bool use_s = (is(1,pick_bits(0,1,minor_op)) && use_agen) || is_reg_arithmetic || is_cflow;
         bool use_z = is(1,pick_bits(1,1,minor_op)) && use_agen;
         bool use_d = (is(1,pick_bits(2,1,minor_op)) && use_agen) || is_imm_arithmetic || is_imm_cbranch;
+        
         // - control for the ALU (too easy)
         val alu_ctrl = minor_op;
 
@@ -242,6 +242,11 @@ int main(int argc, char* argv[]) {
         val reg_out_b = reg_read(regs, reg_s);
         val op_b = or(use_if(use_imm, sext_imm_i), use_if(!use_imm, reg_out_b));
 
+        // check if the condition is true
+        bool is_cond_arith_true = comparator(minor_op, reg_out_a, op_b) && is_conditional_arithmetic;
+        bool is_cond_cflow_true = comparator(minor_op, reg_out_a, op_b) && is_conditional_cflows;
+        bool is_cond_true = is_cond_arith_true || is_cond_cflow_true;
+
         // perform calculations
         val agen_result = address_generate(reg_out_a, reg_out_b, sext_imm_i,
                            shamt, use_z, use_s, use_d);
@@ -255,14 +260,15 @@ int main(int argc, char* argv[]) {
                                 use_if(use_alu, alu_result)))));
 
         // address of succeeding instruction in memory
-        val pc_incremented = add(use_if(is_normal, pc),
-                              or(use_if(is_normal, ins_size), 
+        val pc_incremented = add(use_if(is_normal || !is_cond_true, pc),
+                              or(use_if(is_normal || !is_cond_true, ins_size), 
                               or(use_if(is_jmp, imm_offset_2),
                               or(use_if(is_call, imm_offset_2),
-                              or(use_if(is_conditional_arithmetic, imm_offset_6),
-                                 use_if(is_conditional_cflows, imm_offset_2))))));
+                              or(use_if(is_conditional_arithmetic && is_cond_arith_true, imm_offset_6),
+                                 use_if(is_conditional_cflows && is_cond_cflow_true, imm_offset_2))))));
                                 // hvorfor fucker den??? skal vi lave en for hver evt.? 
                                 // tror den ikke evalurer cb funktionerne, og den derfor altid springer videre
+                                // kan det være vi mangler af muxe nogle resultater, hvis ja hvilke??
 
         // determine the next position of the program counter
         // TODO 2021: Add any additional sources for the next PC (for call, ret, jmp and conditional branch)
@@ -299,3 +305,11 @@ int main(int argc, char* argv[]) {
 
     printf("Done\n");
 }
+
+// hvordan returnere vi en værdi? skal den bare gemmes et bestemt sted???
+// hvorfor fucker den??? skal vi lave en for hver evt.? 
+// tror den ikke evalurer cb funktionerne, og den derfor altid springer videre???
+    // skal vi bruge comparator fra compute.c??? og vi skal vel ikke fixe noget i den, 
+    // selvom der står noget i den stil
+// kan det være vi mangler af muxe nogle resultater, hvis ja hvilke???
+// hvad fanden skal vi gøre med de her, definer bytes, definer en for hver eller ???

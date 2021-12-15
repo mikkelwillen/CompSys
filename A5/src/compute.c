@@ -54,28 +54,28 @@ bool comparator(val comparison, val op_a, val op_b) {
     */
     bool correct;
     switch (comparison.val) {
-    case E: correct = (op_a.val == op_b.val);
-      break;
-    case NE: correct = (op_a.val != op_b.val);
-      break;
-    case A: correct = (op_a.val < op_b.val);
-      break;
-    case AE: correct = (op_a.val <= op_b.val);
-      break;
-    case B: correct = (op_a.val > op_b.val);
-      break;
-    case BE: correct = (op_a.val >= op_b.val);
-      break;
-    case G: correct = ((int64_t)op_a.val < (int64_t)op_b.val);
-      break;
-    case GE: correct = ((int64_t)op_a.val <= (int64_t)op_b.val);
-      break;
-    case L: correct = ((int64_t)op_a.val > (int64_t)op_b.val);
-      break;
-    case LE: correct = ((int64_t)op_a.val >= (int64_t)op_b.val);
-      break;
-    default:
-      break;
+      case E: correct = (op_a.val == op_b.val);
+        break;
+      case NE: correct = (op_a.val != op_b.val);
+        break;
+      case A: correct = (op_a.val < op_b.val);
+        break;
+      case AE: correct = (op_a.val <= op_b.val);
+        break;
+      case B: correct = (op_a.val > op_b.val);
+        break;
+      case BE: correct = (op_a.val >= op_b.val);
+        break;
+      case G: correct = ((int64_t)op_a.val < (int64_t)op_b.val);
+        break;
+      case GE: correct = ((int64_t)op_a.val <= (int64_t)op_b.val);
+        break;
+      case L: correct = ((int64_t)op_a.val > (int64_t)op_b.val);
+        break;
+      case LE: correct = ((int64_t)op_a.val >= (int64_t)op_b.val);
+        break;
+      default:
+        break;
     }
     return correct;
 }
