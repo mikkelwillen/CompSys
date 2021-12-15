@@ -242,7 +242,7 @@ int main(int argc, char* argv[]) {
         val op_b = or(use_if(use_imm, sext_imm_i), use_if(!use_imm, reg_out_b));
 
         // check if the condition is true
-        bool is_cond_true = comparator(minor_op, reg_out_a, op_b) && is_cond_true;
+        bool is_cond_true = comparator(minor_op, reg_out_a, op_b) && is_conditional;
         bool is_normal = !is_call && !is_return && !is_cond_true && !is_jmp;
         // perform calculations
         val agen_result = address_generate(reg_out_a, reg_out_b, sext_imm_i,
