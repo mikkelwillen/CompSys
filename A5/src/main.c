@@ -244,7 +244,7 @@ int main(int argc, char* argv[]) {
 
         // check if the condition is true
         bool is_cond_arith_true = comparator(minor_op, reg_out_a, op_b) && is_conditional_arithmetic;
-        bool is_cond_cflow_true = comparator(minor_op, reg_out_a, op_b) && is_conditional_cflows;
+        bool is_cond_cflow_true = comparator(minor_op, reg_out_a, reg_out_b) && is_conditional_cflows;
         bool is_cond_true = is_cond_arith_true || is_cond_cflow_true;
 
         // perform calculations
