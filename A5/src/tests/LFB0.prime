@@ -1,4 +1,4 @@
-.LFB0:
+test:
     subq $8, %rsp
     movq %r11, (%rsp)
     movq $0, %eax
