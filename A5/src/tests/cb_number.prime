@@ -1,11 +1,11 @@
 test:
-    movq $0, %r11
-    movq $16, %rax
+    movq $0, %rbx
     jmp L2
 
 L1:
-    addq $6, %r11
+    addq $8, %rbx
 
 L2:
-    cbge %rax, %r11, L1
+    cbg $16, %rbx, L1
+    movq %rbx, %r11
     ret %r11

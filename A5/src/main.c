@@ -115,25 +115,25 @@ int main(int argc, char* argv[]) {
         // are, if present, always located at the same position in the instruction
         val major_op = pick_bits(4,  4, inst_bytes[0]);
         val minor_op = pick_bits(0,  4, inst_bytes[0]);
-        val reg_d = pick_bits(4, 4, inst_bytes[1]);
-        val reg_s = pick_bits(0, 4, inst_bytes[1]);
-        val reg_z = pick_bits(4, 4, inst_bytes[2]);
-        val shamt = pick_bits(0, 4, inst_bytes[2]);
+        val reg_d    = pick_bits(4, 4, inst_bytes[1]);
+        val reg_s    = pick_bits(0, 4, inst_bytes[1]);
+        val reg_z    = pick_bits(4, 4, inst_bytes[2]);
+        val shamt    = pick_bits(0, 4, inst_bytes[2]);
 
         // decode instruction type from major operation code
         bool is_return_or_stop = is(RETURN_STOP, major_op);
         bool is_reg_arithmetic = is(REG_ARITHMETIC, major_op);
         bool is_imm_arithmetic = is(IMM_ARITHMETIC, major_op);
-        bool is_reg_movq = is(REG_MOVQ, major_op);
-        bool is_imm_movq = is(IMM_MOVQ, major_op);
-        bool is_reg_movq_mem = is(REG_MOVQ_MEM, major_op);
-        bool is_imm_movq_mem = is(IMM_MOVQ_MEM, major_op);
-        bool is_cflow = is(CFLOW, major_op); /* note that this signal does not include return - though logically it could */
-        bool is_leaq2  = is(LEAQ2, major_op);
-        bool is_leaq3  = is(LEAQ3, major_op);
-        bool is_leaq6  = is(LEAQ6, major_op);
-        bool is_leaq7  = is(LEAQ7, major_op);
-        bool is_imm_cbranch = is(IMM_CBRANCH, major_op);
+        bool is_reg_movq       = is(REG_MOVQ, major_op);
+        bool is_imm_movq       = is(IMM_MOVQ, major_op);
+        bool is_reg_movq_mem   = is(REG_MOVQ_MEM, major_op);
+        bool is_imm_movq_mem   = is(IMM_MOVQ_MEM, major_op);
+        bool is_cflow          = is(CFLOW, major_op); /* note that this signal does not include return - though logically it could */
+        bool is_leaq2          = is(LEAQ2, major_op);
+        bool is_leaq3          = is(LEAQ3, major_op);
+        bool is_leaq6          = is(LEAQ6, major_op);
+        bool is_leaq7          = is(LEAQ7, major_op);
+        bool is_imm_cbranch    = is(IMM_CBRANCH, major_op);
 
         // Right now, we can only execute instructions with a size of 2.
         // TODO 2021:
@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
         val ins_size = from_int(is_return_or_stop * 2
                               + is_reg_arithmetic * 2
                               + is_imm_arithmetic * 6 // hvad fanden skal vi gøre med de her, definer bytes, definer en for hver eller ???
-                              + is_reg_movq * 2
+                              + is_reg_movq * 2  // måske laves med or use_if ting
                               + is_imm_movq * 6
                               + is_reg_movq_mem * 2
                               + is_imm_movq_mem * 6
@@ -165,8 +165,8 @@ int main(int argc, char* argv[]) {
         bool imm_p_pos6 = is_imm_cbranch; /* all other at position 2 */
 
         // load or store
-        bool is_minor_load = is(LOAD_REG, minor_op) || is(LOAD_IMM, minor_op);
-        bool is_minor_store = is(STORE_REG, minor_op) || is(STORE_IMM, minor_op);
+        bool is_minor_load        = is(LOAD_REG, minor_op) || is(LOAD_IMM, minor_op);
+        bool is_minor_store       = is(STORE_REG, minor_op) || is(STORE_IMM, minor_op);
         bool is_minor_conditional = is(EQUAL, minor_op) || 
                                     is(NOT_EQUAL, minor_op) ||
                                     is(LESS, minor_op) ||
@@ -179,10 +179,10 @@ int main(int argc, char* argv[]) {
                                     is(BELOWEQUAL, minor_op);
         
         // unimplemented control signals (not anymore):
-        bool is_load  = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
-        bool is_store = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
+        bool is_load        = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
+        bool is_store       = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
         bool is_conditional = (is_imm_arithmetic || is_cflow) && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
-        bool is_jmp = is_cflow && is(JMP, minor_op);
+        bool is_jmp         = is_cflow && is(JMP, minor_op);
         
 
         // TODO 2021: Add additional control signals you may need below....
@@ -196,12 +196,12 @@ int main(int argc, char* argv[]) {
 
         // control signals for the compute section:
         // - pick result of compute section
-        bool use_agen = is_leaq || is_move;
-        bool is_arithmetic = is_imm_arithmetic | is_reg_arithmetic;
+        bool use_agen       = is_leaq || is_move;
+        bool is_arithmetic  = is_imm_arithmetic | is_reg_arithmetic;
         bool use_multiplier = is_arithmetic && (is(MUL, minor_op) || is(IMUL, minor_op));
-        bool use_shifter = is_arithmetic && (is(SAR, minor_op) || is(SAL, minor_op) || is(SHR, minor_op));
-        bool use_direct = is_reg_movq || is_imm_movq;
-        bool use_alu = (is_arithmetic || is_conditional) && !(use_shifter | use_multiplier);
+        bool use_shifter    = is_arithmetic && (is(SAR, minor_op) || is(SAL, minor_op) || is(SHR, minor_op));
+        bool use_direct     = is_reg_movq || is_imm_movq;
+        bool use_alu        = (is_arithmetic || is_conditional) && !(use_shifter | use_multiplier);
 
         // - control for agen
         bool use_s = (is(1,pick_bits(0,1,minor_op)) && use_agen) || is_reg_arithmetic || is_cflow;
@@ -212,7 +212,7 @@ int main(int argc, char* argv[]) {
         val alu_ctrl = minor_op;
 
         // - control for the multiplier
-        bool mul_is_signed = is(IMUL, minor_op);
+        bool mul_is_signed  = is(IMUL, minor_op);
 
         // - control for the shifter
         bool shft_is_signed = is(SAR, minor_op) | is(SAL, minor_op);
@@ -239,16 +239,16 @@ int main(int argc, char* argv[]) {
         // read registers
         val reg_out_a = reg_read(regs, reg_read_dz);
         val reg_out_b = reg_read(regs, reg_s);
-        val op_b = or(use_if(use_imm, sext_imm_i), use_if(!use_imm, reg_out_b));
+        val op_b      = or(use_if(use_imm, sext_imm_i), use_if(!use_imm, reg_out_b));
 
         // check if the condition is true
-        bool is_cond_true = comparator(minor_op, reg_out_a, op_b) && is_conditional;
-        bool is_normal = !is_call && !is_return && !is_cond_true && !is_jmp;
+        bool is_cond_true  = comparator(minor_op, reg_out_a, op_b) && is_conditional;
+        bool is_normal     = !is_call && !is_return && !is_cond_true && !is_jmp;
         // perform calculations
-        val agen_result = address_generate(reg_out_a, reg_out_b, sext_imm_i,
+        val agen_result    = address_generate(reg_out_a, reg_out_b, sext_imm_i,
                            shamt, use_z, use_s, use_d);
-        val alu_result = alu_execute(alu_ctrl, reg_out_a, op_b);
-        val mul_result = multiplier(mul_is_signed, reg_out_a, op_b);
+        val alu_result     = alu_execute(alu_ctrl, reg_out_a, op_b);
+        val mul_result     = multiplier(mul_is_signed, reg_out_a, op_b);
         val shifter_result = shifter(shft_is_left, shft_is_signed, reg_out_a, op_b);
         val compute_result = or(use_if(use_agen, agen_result),
                              or(use_if(use_multiplier, mul_result),
@@ -258,10 +258,10 @@ int main(int argc, char* argv[]) {
 
         // address of succeeding instruction in memory
         val pc_incremented = add(pc, ins_size);
-        val pc_jmp = sext_imm_p;
-        val pc_call = sext_imm_p;
+        val pc_jmp         = sext_imm_p;
+        val pc_call        = sext_imm_p;
         val pc_conditional = sext_imm_p;
-        val pc_return = reg_out_b;
+        val pc_return      = reg_out_b;
                                 // kan det være vi mangler af muxe nogle resultater, hvis ja hvilke??
 
         // determine the next position of the program counter
