@@ -1,0 +1,11 @@
+test:
+    movq $0, %r11
+    movq $16, %rax
+    jmp L2
+
+L1:
+    addq $6, %r11
+
+L2:
+    cbge %rax, %r11, L1
+    ret %r11

@@ -1,0 +1,3 @@
+test:
+    addq $8, %r11
+    ret %r11

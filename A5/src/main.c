@@ -261,7 +261,7 @@ int main(int argc, char* argv[]) {
         val pc_jmp = sext_imm_p;
         val pc_call = sext_imm_p;
         val pc_conditional = sext_imm_p;
-                                // tror den ikke evalurer cb funktionerne, og den derfor altid springer videre
+        val pc_return = reg_out_b;
                                 // kan det være vi mangler af muxe nogle resultater, hvis ja hvilke??
 
         // determine the next position of the program counter
@@ -271,8 +271,8 @@ int main(int argc, char* argv[]) {
         val pc_next = or(use_if(is_normal, pc_incremented),
                       or(use_if(is_jmp, pc_jmp),
                       or(use_if(is_call, pc_call),
-                        (use_if(is_cond_true, pc_conditional)))));
-                        // return????
+                      or(use_if(is_cond_true, pc_conditional),
+                        (use_if(is_return, pc_return))))));
         /*** MEMORY ***/
         // read from memory if needed
         val mem_out = memory_read(mem, agen_result, is_load);

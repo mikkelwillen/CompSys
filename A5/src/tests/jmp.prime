@@ -1,0 +1,9 @@
+test:
+    addq $8, %r11
+    jmp L1
+
+L2:
+    addq $8, %r11
+
+L1:
+    ret %r11
