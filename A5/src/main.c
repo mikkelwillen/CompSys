@@ -181,10 +181,9 @@ int main(int argc, char* argv[]) {
         // unimplemented control signals (not anymore):
         bool is_load  = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
         bool is_store = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
-        bool is_conditional_arithmetic = is_imm_arithmetic && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
-        bool is_conditional_cflows = is_cflow && is_minor_conditional;
+        bool is_conditional = (is_imm_arithmetic || is_cflow) && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
         bool is_jmp = is_cflow && is(JMP, minor_op);
-        bool is_normal = !is_call && !is_return && !is_conditional_arithmetic && !is_conditional_cflows && !is_jmp;
+        
 
         // TODO 2021: Add additional control signals you may need below....
 
@@ -202,7 +201,7 @@ int main(int argc, char* argv[]) {
         bool use_multiplier = is_arithmetic && (is(MUL, minor_op) || is(IMUL, minor_op));
         bool use_shifter = is_arithmetic && (is(SAR, minor_op) || is(SAL, minor_op) || is(SHR, minor_op));
         bool use_direct = is_reg_movq || is_imm_movq;
-        bool use_alu = (is_arithmetic || is_conditional_arithmetic || is_conditional_cflows) && !(use_shifter | use_multiplier);
+        bool use_alu = (is_arithmetic || is_conditional) && !(use_shifter | use_multiplier);
 
         // - control for agen
         bool use_s = (is(1,pick_bits(0,1,minor_op)) && use_agen) || is_reg_arithmetic || is_cflow;
@@ -243,10 +242,8 @@ int main(int argc, char* argv[]) {
         val op_b = or(use_if(use_imm, sext_imm_i), use_if(!use_imm, reg_out_b));
 
         // check if the condition is true
-        bool is_cond_arith_true = comparator(minor_op, reg_out_a, op_b) && is_conditional_arithmetic;
-        bool is_cond_cflow_true = comparator(minor_op, reg_out_a, reg_out_b) && is_conditional_cflows;
-        bool is_cond_true = is_cond_arith_true || is_cond_cflow_true;
-
+        bool is_cond_true = comparator(minor_op, reg_out_a, op_b) && is_cond_true;
+        bool is_normal = !is_call && !is_return && !is_cond_true && !is_jmp;
         // perform calculations
         val agen_result = address_generate(reg_out_a, reg_out_b, sext_imm_i,
                            shamt, use_z, use_s, use_d);
@@ -260,13 +257,10 @@ int main(int argc, char* argv[]) {
                                 use_if(use_alu, alu_result)))));
 
         // address of succeeding instruction in memory
-        val pc_incremented = add(use_if(is_normal || !is_cond_true, pc),
-                              or(use_if(is_normal || !is_cond_true, ins_size), 
-                              or(use_if(is_jmp, imm_offset_2),
-                              or(use_if(is_call, imm_offset_2),
-                              or(use_if(is_conditional_arithmetic && is_cond_arith_true, imm_offset_6),
-                                 use_if(is_conditional_cflows && is_cond_cflow_true, imm_offset_2))))));
-                                // hvorfor fucker den??? skal vi lave en for hver evt.? 
+        val pc_incremented = add(pc, ins_size);
+        val pc_jmp = sext_imm_p;
+        val pc_call = sext_imm_p;
+        val pc_conditional = sext_imm_p;
                                 // tror den ikke evalurer cb funktionerne, og den derfor altid springer videre
                                 // kan det være vi mangler af muxe nogle resultater, hvis ja hvilke??
 
@@ -274,8 +268,11 @@ int main(int argc, char* argv[]) {
         // TODO 2021: Add any additional sources for the next PC (for call, ret, jmp and conditional branch)
 
         // hvordan returnere vi en værdi? skal den bare gemmes et bestemt sted???
-        val pc_next = pc_incremented;
-
+        val pc_next = or(use_if(is_normal, pc_incremented),
+                      or(use_if(is_jmp, pc_jmp),
+                      or(use_if(is_call, pc_call),
+                        (use_if(is_cond_true, pc_conditional)))));
+                        // return????
         /*** MEMORY ***/
         // read from memory if needed
         val mem_out = memory_read(mem, agen_result, is_load);
