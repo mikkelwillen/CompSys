@@ -1,0 +1,3 @@
+test:
+    subq $8, %rax
+    

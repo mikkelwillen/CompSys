@@ -1,0 +1,7 @@
+test:
+    movq $8, %r11
+    call L3, %r11
+
+L3:
+    addq $4, %r11
+    ret %r11

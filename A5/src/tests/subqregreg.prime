@@ -1,0 +1,4 @@
+test:
+    movq $8, %rax
+    subq %rax, %r11
+    

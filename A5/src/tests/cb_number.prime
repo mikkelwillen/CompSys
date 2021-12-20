@@ -6,6 +6,6 @@ L1:
     addq $8, %rbx
 
 L2:
-    cbg $16, %rbx, L1
+    cbg $8, %rbx, L1
     movq %rbx, %r11
     ret %r11

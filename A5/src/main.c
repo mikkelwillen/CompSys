@@ -138,19 +138,16 @@ int main(int argc, char* argv[]) {
         // Right now, we can only execute instructions with a size of 2.
         // TODO 2021:
         // from info above determine the instruction size
-        val ins_size = from_int(is_return_or_stop * 2
-                              + is_reg_arithmetic * 2
-                              + is_imm_arithmetic * 6 // hvad fanden skal vi gøre med de her, definer bytes, definer en for hver eller ???
-                              + is_reg_movq * 2  // måske laves med or use_if ting
-                              + is_imm_movq * 6
-                              + is_reg_movq_mem * 2
-                              + is_imm_movq_mem * 6
-                              + is_cflow * 6
-                              + is_leaq2 * 2
-                              + is_leaq3 * 3
-                              + is_leaq6 * 6
-                              + is_leaq7 * 7
-                              + is_imm_cbranch * 10); 
+        bool len2 = is_return_or_stop || is_reg_arithmetic || is_reg_movq || is_reg_movq_mem || is_leaq2;
+        bool len3 = is_leaq3;
+        bool len6 = is_imm_arithmetic || is_imm_movq || is_imm_movq_mem || is_cflow || is_leaq6;
+        bool len7 = is_leaq7;
+        bool len10 = is_imm_cbranch;
+        val ins_size = or(use_if(len2, from_int(2)),
+                       or(use_if(len3, from_int(3)),
+                       or(use_if(len6, from_int(6)),
+                       or(use_if(len7, from_int(7)),
+                         (use_if(len10, from_int(10)))))));
 
         // broad categorization of the instruction
         bool is_leaq = is_leaq2 || is_leaq3 || is_leaq6 || is_leaq7;
@@ -181,7 +178,7 @@ int main(int argc, char* argv[]) {
         // unimplemented control signals (not anymore):
         bool is_load        = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
         bool is_store       = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
-        bool is_conditional = (is_imm_arithmetic || is_cflow) && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
+        bool is_conditional = (is_imm_cbranch || is_cflow) && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
         bool is_jmp         = is_cflow && is(JMP, minor_op);
         
 
@@ -262,12 +259,9 @@ int main(int argc, char* argv[]) {
         val pc_call        = sext_imm_p;
         val pc_conditional = sext_imm_p;
         val pc_return      = reg_out_b;
-                                // kan det være vi mangler af muxe nogle resultater, hvis ja hvilke??
 
         // determine the next position of the program counter
         // TODO 2021: Add any additional sources for the next PC (for call, ret, jmp and conditional branch)
-
-        // hvordan returnere vi en værdi? skal den bare gemmes et bestemt sted???
         val pc_next = or(use_if(is_normal, pc_incremented),
                       or(use_if(is_jmp, pc_jmp),
                       or(use_if(is_call, pc_call),
@@ -282,7 +276,8 @@ int main(int argc, char* argv[]) {
         // TODO 2021: Add any additional results which need to be muxed in for writing to the destination register
         bool use_compute_result = !is_load && (use_agen || use_multiplier || use_shifter || use_direct || use_alu);
         val datapath_result = or(use_if(use_compute_result, compute_result),
-                                 use_if(is_load, mem_out));
+                              or(use_if(is_call, pc_incremented),
+                                 use_if(is_load, mem_out)));
 
         // write to register if needed
         reg_write(regs, reg_d, datapath_result, reg_wr_enable);
@@ -302,11 +297,3 @@ int main(int argc, char* argv[]) {
 
     printf("Done\n");
 }
-
-// hvordan returnere vi en værdi? skal den bare gemmes et bestemt sted???
-// hvorfor fucker den??? skal vi lave en for hver evt.? 
-// tror den ikke evalurer cb funktionerne, og den derfor altid springer videre???
-    // skal vi bruge comparator fra compute.c??? og vi skal vel ikke fixe noget i den, 
-    // selvom der står noget i den stil
-// kan det være vi mangler af muxe nogle resultater, hvis ja hvilke???
-// hvad fanden skal vi gøre med de her, definer bytes, definer en for hver eller ???
