@@ -135,9 +135,7 @@ int main(int argc, char* argv[]) {
         bool is_leaq7          = is(LEAQ7, major_op);
         bool is_imm_cbranch    = is(IMM_CBRANCH, major_op);
 
-        // Right now, we can only execute instructions with a size of 2.
-        // TODO 2021:
-        // from info above determine the instruction size
+        // writes the right instructionsize
         bool len2 = is_return_or_stop || is_reg_arithmetic || is_reg_movq || is_reg_movq_mem || is_leaq2;
         bool len3 = is_leaq3;
         bool len6 = is_imm_arithmetic || is_imm_movq || is_imm_movq_mem || is_cflow || is_leaq6;
@@ -174,15 +172,12 @@ int main(int argc, char* argv[]) {
                                     is(ABOVEEQUAL, minor_op) ||
                                     is(BELOW, minor_op) ||
                                     is(BELOWEQUAL, minor_op);
-        
-        // unimplemented control signals (not anymore):
-        bool is_load        = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load; // TODO 2021: Detect when we're executing a load
-        bool is_store       = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store; // TODO 2021: Detect when we're executing a store
-        bool is_conditional = (is_imm_cbranch || is_cflow) && is_minor_conditional; // TODO 2021: Detect if we are executing a conditional flow change
-        bool is_jmp         = is_cflow && is(JMP, minor_op);
-        
 
-        // TODO 2021: Add additional control signals you may need below....
+        // checking memory and control flow
+        bool is_load        = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_load;
+        bool is_store       = (is_reg_movq_mem || is_imm_movq_mem) && is_minor_store;
+        bool is_conditional = (is_imm_cbranch || is_cflow) && is_minor_conditional;
+        bool is_jmp         = is_cflow && is(JMP, minor_op);
 
         // setting up operand fetch and register read and write for the datapath:
         bool use_imm = is_imm_movq | is_imm_arithmetic | is_imm_cbranch;
@@ -238,9 +233,10 @@ int main(int argc, char* argv[]) {
         val reg_out_b = reg_read(regs, reg_s);
         val op_b      = or(use_if(use_imm, sext_imm_i), use_if(!use_imm, reg_out_b));
 
-        // check if the condition is true
+        // check if the conditional control flow is true
         bool is_cond_true  = comparator(minor_op, reg_out_a, op_b) && is_conditional;
         bool is_normal     = !is_call && !is_return && !is_cond_true && !is_jmp;
+
         // perform calculations
         val agen_result    = address_generate(reg_out_a, reg_out_b, sext_imm_i,
                            shamt, use_z, use_s, use_d);
@@ -260,20 +256,19 @@ int main(int argc, char* argv[]) {
         val pc_conditional = sext_imm_p;
         val pc_return      = reg_out_b;
 
-        // determine the next position of the program counter
-        // TODO 2021: Add any additional sources for the next PC (for call, ret, jmp and conditional branch)
+        // determines the next position of the program counter
         val pc_next = or(use_if(is_normal, pc_incremented),
                       or(use_if(is_jmp, pc_jmp),
                       or(use_if(is_call, pc_call),
                       or(use_if(is_cond_true, pc_conditional),
                         (use_if(is_return, pc_return))))));
+
         /*** MEMORY ***/
         // read from memory if needed
         val mem_out = memory_read(mem, agen_result, is_load);
 
         /*** WRITE ***/
         // choose result to write back to register
-        // TODO 2021: Add any additional results which need to be muxed in for writing to the destination register
         bool use_compute_result = !is_load && (use_agen || use_multiplier || use_shifter || use_direct || use_alu);
         val datapath_result = or(use_if(use_compute_result, compute_result),
                               or(use_if(is_call, pc_incremented),
